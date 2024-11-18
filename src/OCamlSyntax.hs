@@ -21,68 +21,67 @@ instance Monoid Block where
   mempty :: Block
   mempty = Block []
 
-data Statement
-  = Assign Var Expression -- x = e
-  | If Expression Block Block -- if e then s1 else s2 end
-  | While Expression Block -- while e do s end
-  | Empty -- ';'
-  | Repeat Block Expression -- repeat s until e
-  deriving (Eq, Show)
+type Identifier = String -- the name of a variable (including function variables/top-level decls)
+
+data Value
+  = IntVal Int -- -inf - inf
+  | BoolVal Bool -- false, true
+  | TupleVal [Value] -- (1, 2)
+  | ListVal [Value] -- [1; 2]
+  | FunctionVal [Identifier] Expression -- fun x -> x * 2
+  deriving (Eq, Show, Ord)
+
+type Scope = Map Identifier Value
 
 data Expression
-  = Var Var -- global variables x and table indexing
+  = Var Identifier -- variables, in any scope
   | Val Value -- literal values
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
-  | TableConst [TableField] -- table construction, { x = 3 , y = 5 }
+  | ListConst [Expression] -- list construction, like [1; 2; 3]
+  | TupleConst [Expression] -- tuple construction, like (1, 2, 3)
+  | FunctionConst [Identifier] Expression -- function construction, like fun x -> x * 2
+  | If Expression Expression Expression -- If Expression then Expression else Expression
+  | Match Expression [(Pattern, Expression)] -- match expression, like match x with | [] -> 1 | x::xs -> 2
+  | Let Identifier Expression Expression -- let identifier = expression in expression
   deriving (Eq, Show)
 
-data Value
-  = NilVal -- nil
-  | IntVal Int -- 1
-  | BoolVal Bool -- false, true
-  | StringVal String -- "abd"
-  | TableVal TableName -- <not used in source programs>
-  deriving (Eq, Show, Ord)
-
-newtype TableName = TN String -- must begin with '_'
-  deriving (Eq, Ord)
-
-instance Show TableName where
-  show :: TableName -> String
-  show (TN s) = s
+data Pattern
+  = IntConstPat Int -- match an integer constant
+  | BoolConstPat Bool -- match a bool constant
+  | IdentifierPat Identifier -- match an identifier
+  | ListPat [Pattern] -- match a list of patterns (e.g., [x; y; z])
+  | ConsPat Pattern Pattern -- match head-tail pattern (e.g., x::xs)
+  | TuplePat [Pattern] -- match a tuple (e.g., (x, y))
+  | WildcardPat -- match anything (underscore `_`)
+  deriving (Show, Eq)
 
 data Uop
   = Neg -- `-` :: Int -> Int
   | Not -- `not` :: a -> Bool
-  | Len -- `#` :: String -> Int / Table -> Int
   deriving (Eq, Show, Enum, Bounded)
 
 data Bop
   = Plus -- `+`  :: Int -> Int -> Int
   | Minus -- `-`  :: Int -> Int -> Int
   | Times -- `*`  :: Int -> Int -> Int
-  | Divide -- `//` :: Int -> Int -> Int   -- floor division
-  | Modulo -- `%`  :: Int -> Int -> Int   -- modulo
-  | Eq -- `==` :: a -> a -> Bool
+  | Divide -- `/` :: Int -> Int -> Int   -- floor division
+  | Mod -- `mod`  :: Int -> Int -> Int   -- modulo
+  | Eq -- `=` :: a -> a -> Bool
   | Gt -- `>`  :: a -> a -> Bool
   | Ge -- `>=` :: a -> a -> Bool
   | Lt -- `<`  :: a -> a -> Bool
   | Le -- `<=` :: a -> a -> Bool
-  | Concat -- `..` :: String -> String -> String
+  | Append -- `@` :: 'a List -> 'a List -> 'a List
+  | Cons -- `::` :: 'a -> 'a List -> 'a List
+  | Or -- `||`
+  | And -- `&&`
   deriving (Eq, Show, Enum, Bounded)
 
-type Name = String -- either the name of a variable or the name of a field
-
-data Var
-  = Name Name -- x, global variable
-  | Dot Expression Name -- t.x, access table using string key
-  | Proj Expression Expression -- t[1], access table table using any type of key
-  deriving (Eq, Show)
-
-data TableField
-  = FieldName Name Expression -- x = 3,
-  | FieldKey Expression Expression -- ["x"] = true , [1] = 4 , [true] = "a"
+data Statement
+  = FunctionDecl Bool Identifier [Identifier] Expression
+  | VarDecl Identifier Expression
+  | Empty -- ';'
   deriving (Eq, Show)
 
 var :: String -> Expression
@@ -295,7 +294,8 @@ instance PP Statement where
   pp Empty = PP.semi
   pp (Repeat b e) =
     PP.hang (PP.text "repeat") 2 (pp b)
-      PP.$+$ PP.text "until" <+> pp e
+      PP.$+$ PP.text "until"
+      <+> pp e
 
 level :: Bop -> Int
 level Times = 7
