@@ -174,14 +174,6 @@ wBfs = Block [Assign (Name "start") (Val (IntVal 1)), Assign (Name "goal") (Val 
 -- Block [Assign (Name "x") (Op2 (Op2 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))) Minus (Val (IntVal 3))) Plus (Op2 (Val (IntVal 1)) Plus (Val (IntVal 3)))),Assign (Name "y") (Val (IntVal 0)),While (Op2 (Var (Name "x")) Gt (Val (IntVal 0))) (Block [Assign (Name "y") (Op2 (Var (Name "y")) Plus (Var (Name "x"))),Assign (Name "x") (Op2 (Var (Name "x")) Minus (Val (IntVal 1)))])]
 
 -- >>> pretty wTest
--- /Users/sweirich/5520/23fa/hw/hw05/src/LuSyntax.lhs:342:47: error:
---     • Couldn't match type ‘TableName’ with ‘[Char]’
---       Expected: String
---         Actual: TableName
---     • In the first argument of ‘PP.text’, namely ‘t’
---       In the first argument of ‘(<>)’, namely ‘PP.text t’
---       In the second argument of ‘(<>)’, namely ‘PP.text t <> PP.text ">"’
--- (deferred type error)
 
 class PP a where
   pp :: a -> Doc
