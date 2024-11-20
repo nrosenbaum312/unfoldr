@@ -1,11 +1,11 @@
-module OCamlParser where
-
-import Control.Exception (PatternMatchFail)
-import GHC.Base (undefined, (<|>))
-import GHC.Generics (Par1)
-import OCamlPrettyPrinter
 import OCamlSyntax
-import Parser
+import GHC.Base (undefined, (<|>), many)
+import Control.Exception (PatternMatchFail)
+import GHC.Generics (Par1)
+import OCamlPrettyPrinter 
+import OCamlSyntax
+import Parser as P
+import Test.HUnit
 
 --- quickCheck properties that ensures that parsing is the inverse of printing
 
@@ -18,7 +18,8 @@ prop_roundtrip_exp e = parse expP (pretty e) == Right e
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = parse statementP (pretty s) == Right s
 
---- Values
+
+--- Values 
 valueP :: Parser Value
 valueP = intValP <|> boolValP <|> tupleValP <|> listValP <|> functionValP
 
@@ -29,77 +30,127 @@ boolValP :: Parser Value
 boolValP = undefined
 
 tupleValP :: Parser Value
-tupleValP = undefined
+tupleValP = undefined 
 
 listValP :: Parser Value
-listValP = undefined
+listValP = undefined 
 
 functionValP :: Parser Value
-functionValP = undefined
+functionValP = undefined 
+
+
+test_value :: Test
+test_value =
+  "parsing values"
+    ~: TestList
+      [ P.parse (many intValP) "1 2\n 3" ~?= Right [IntVal 1, IntVal 2, IntVal 3],
+        P.parse (many boolValP) "true false\n true" ~?= Right [BoolVal True, BoolVal False, BoolVal True],
+        P.parse tupleValP "(1, 2)" ~?= Right (TupleVal [IntVal 1, IntVal 2]),
+        P.parse listValP "[1; 2; 3]" ~?= Right (ListVal [IntVal 1, IntVal 2, IntVal 3]),
+        P.parse functionValP "fun x -> x + 1" ~?= Right (FunctionVal ["x"] (Op2 (Var "x") Plus (Val (IntVal 1))))
+      ]
 
 --- Identifier
-
-idP :: Parser Identifier
+idP :: Parser Identifier 
 idP = undefined
 
---- Expressions
+--- Expressions 
 expP :: Parser Expression
 expP = undefined
 
-varP :: Parser Expression
-varP = undefined
+varP :: Parser Expression 
+varP = undefined 
 
-valP :: Parser Expression
-valP = undefined
+valP :: Parser Expression 
+valP = undefined 
 
-op1P :: Parser Expression
+op1P :: Parser Expression 
 op1P = undefined
 
-op2P :: Parser Expression
+op2P :: Parser Expression 
 op2P = undefined
 
-listConstP :: Parser Expression
+listConstP :: Parser Expression 
 listConstP = undefined
 
-tupleConstP :: Parser Expression
-tupleConstP = undefined
+tupleConstP :: Parser Expression 
+tupleConstP = undefined 
 
-functionConstP :: Parser Expression
-functionConstP = undefined
+functionConstP :: Parser Expression 
+functionConstP = undefined 
 
-ifP :: Parser Expression
+ifP :: Parser Expression 
 ifP = undefined
 
 matchP :: Parser Expression
-matchP = undefined
+matchP = undefined 
 
-letP :: Parser Expression
-letP = undefined
+letP :: Parser Expression 
+letP = undefined 
 
---- Patterns
-patternP :: Parser Pattern
-patternP = undefined
+test_expression :: Test
+test_expression =
+  "parsing expressions"
+    ~: TestList
+      [ 
+        P.parse varP "x" ~?= Right (Var "x"),
+        P.parse valP "42" ~?= Right (Val (IntVal 42)),
+        P.parse op1P "-x" ~?= Right (Op1 Neg (Var "x")),
+        P.parse op2P "x + 1" ~?= Right (Op2 (Var "x") Plus (Val (IntVal 1))),
+        P.parse listConstP "[1; 2; 3]" ~?= Right (ListConst [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)]),
+        P.parse tupleConstP "(1, x)" ~?= Right (TupleConst [Val (IntVal 1), Var "x"]),
+        P.parse functionConstP "fun x y -> x + y"
+          ~?= Right (FunctionConst ["x", "y"] (Op2 (Var "x") Plus (Var "y"))),
+        P.parse ifP "if true then 1 else 0"
+          ~?= Right (If (Val (BoolVal True)) (Val (IntVal 1)) (Val (IntVal 0))),
+        P.parse letP "let x = 1 in x + 1"
+          ~?= Right (Let "x" (Val (IntVal 1)) (Op2 (Var "x") Plus (Val (IntVal 1)))),
+        P.parse matchP "match x with | [] -> 1 | x::xs -> 2"
+          ~?= Right
+            (Match
+              (Var "x")
+              [ (ListPat [], Val (IntVal 1)),
+                (ConsPat (IdentifierPat "x") (IdentifierPat "xs"), Val (IntVal 2))
+              ])
+      ]
+
+--- Patterns 
+patternP :: Parser Pattern 
+patternP = undefined 
 
 intConstPatP :: Parser Pattern
-intConstPatP = undefined
+intConstPatP = undefined 
 
-boolConstPatP :: Parser Pattern
-boolConstPatP = undefined
+boolConstPatP :: Parser Pattern 
+boolConstPatP = undefined 
 
 identifierPatP :: Parser Pattern
-identifierPatP = undefined
+identifierPatP = undefined 
 
-listPatP :: Parser Pattern
-listPatP = undefined
+listPatP :: Parser Pattern 
+listPatP = undefined 
 
-consPatP :: Parser Pattern
-consPatP = undefined
+consPatP :: Parser Pattern 
+consPatP = undefined 
 
-tuplePatP :: Parser Pattern
-tuplePatP = undefined
+tuplePatP :: Parser Pattern 
+tuplePatP = undefined 
 
-wildcardPatP :: Parser Pattern
-wildcardPatP = undefined
+wildcardPatP :: Parser Pattern 
+wildcardPatP = undefined 
+
+test_pattern :: Test
+test_pattern =
+  "parsing patterns"
+    ~: TestList
+      [ P.parse intConstPatP "| 42" ~?= Right (IntConstPat 42),
+        P.parse boolConstPatP "| true" ~?= Right (BoolConstPat True),
+        P.parse identifierPatP "| x" ~?= Right (IdentifierPat "x"),
+        P.parse listPatP "| [x; y; z]" ~?= Right (ListPat [IdentifierPat "x", IdentifierPat "y", IdentifierPat "z"]),
+        P.parse consPatP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
+        P.parse tuplePatP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
+        P.parse wildcardPatP "| _" ~?= Right WildcardPat
+      ]
 
 --- OPS
 
@@ -107,31 +158,31 @@ bopP :: Parser Bop
 bopP = undefined
 
 uopP :: Parser Uop
-uopP = undefined
+uopP = undefined 
 
---- statements
+--- statements 
 statementP :: Parser Statement
-statementP = functionDeclP <|> varDeclP <|> emptyP
+statementP = functionDeclP <|> varDeclP <|> emptyP 
 
 functionDeclP :: Parser Statement
 functionDeclP = undefined
 
 varDeclP :: Parser Statement
-varDeclP = undefined
+varDeclP = undefined 
 
 emptyP :: Parser Statement
-emptyP = undefined
+emptyP = undefined 
 
 blockP :: Parser Block
-blockP = undefined
+blockP = undefined 
 
 --- top level
 
-parseOCamlExp :: String -> Either ParseError Expression
-parseOCamlExp = undefined
+parseOcamlExp :: String -> Either ParseError Expression
+parseOcamlExp = undefined 
 
-parseOCamlStat :: String -> Either ParseError Statement
-parseOCamlStat = undefined
+parseOcamlStat :: String -> Either ParseError Statement
+parseOcamlStat = undefined 
 
 parseOcaml :: String -> IO (Either ParseError Block)
-parseOcaml = undefined
+parseOcaml = undefined 
