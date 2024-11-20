@@ -1,20 +1,22 @@
 module OCamlParser where
 
 import Control.Exception (PatternMatchFail)
-import GHC.Base (undefined)
+import GHC.Base (undefined, (<|>))
 import GHC.Generics (Par1)
+import OCamlPrettyPrinter
 import OCamlSyntax
+import Parser
 
 --- quickCheck properties that ensures that parsing is the inverse of printing
 
 prop_roundtrip_val :: Value -> Bool
-prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
+prop_roundtrip_val v = parse valueP (pretty v) == Right v
 
 prop_roundtrip_exp :: Expression -> Bool
-prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
+prop_roundtrip_exp e = parse expP (pretty e) == Right e
 
 prop_roundtrip_stat :: Statement -> Bool
-prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
+prop_roundtrip_stat s = parse statementP (pretty s) == Right s
 
 --- Values
 valueP :: Parser Value
@@ -63,8 +65,7 @@ tupleConstP :: Parser Expression
 tupleConstP = undefined
 
 functionConstP :: Parser Expression
-
-fucntionConstP = undefined
+functionConstP = undefined
 
 ifP :: Parser Expression
 ifP = undefined
@@ -86,8 +87,7 @@ boolConstPatP :: Parser Pattern
 boolConstPatP = undefined
 
 identifierPatP :: Parser Pattern
-
-indentifierPatP = undefined
+identifierPatP = undefined
 
 listPatP :: Parser Pattern
 listPatP = undefined
@@ -99,8 +99,7 @@ tuplePatP :: Parser Pattern
 tuplePatP = undefined
 
 wildcardPatP :: Parser Pattern
-
-wildCardPatP = undefined
+wildcardPatP = undefined
 
 --- OPS
 
@@ -128,13 +127,11 @@ blockP = undefined
 
 --- top level
 
-parseOcamlExp :: String -> Either P.ParseError Expression
+parseOCamlExp :: String -> Either ParseError Expression
+parseOCamlExp = undefined
 
-parseLuExp = undefined
+parseOCamlStat :: String -> Either ParseError Statement
+parseOCamlStat = undefined
 
-parseOcamlStat :: String -> Either P.ParseError Statement
-
-parseLuStat = undefined
-
-parseOcaml :: String -> IO (Either P.ParseError Block)
+parseOcaml :: String -> IO (Either ParseError Block)
 parseOcaml = undefined
