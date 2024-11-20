@@ -1,7 +1,9 @@
-import OCamlSyntax
-import GHC.Base (undefined)
+module OCamlParser where
+
 import Control.Exception (PatternMatchFail)
+import GHC.Base (undefined)
 import GHC.Generics (Par1)
+import OCamlSyntax
 
 --- quickCheck properties that ensures that parsing is the inverse of printing
 
@@ -14,8 +16,7 @@ prop_roundtrip_exp e = P.parse expP (pretty e) == Right e
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = P.parse statementP (pretty s) == Right s
 
-
---- Values 
+--- Values
 valueP :: Parser Value
 valueP = intValP <|> boolValP <|> tupleValP <|> listValP <|> functionValP
 
@@ -26,78 +27,80 @@ boolValP :: Parser Value
 boolValP = undefined
 
 tupleValP :: Parser Value
-tupleValP = undefined 
+tupleValP = undefined
 
 listValP :: Parser Value
-listValP = undefined 
+listValP = undefined
 
 functionValP :: Parser Value
-functionValP = undefined 
+functionValP = undefined
 
 --- Identifier
 
-idP :: Parser Identifier 
+idP :: Parser Identifier
 idP = undefined
 
---- Expressions 
+--- Expressions
 expP :: Parser Expression
 expP = undefined
 
-varP :: Parser Expression 
-varP = undefined 
+varP :: Parser Expression
+varP = undefined
 
-valP :: Parser Expression 
-valP = undefined 
+valP :: Parser Expression
+valP = undefined
 
-op1P :: Parser Expression 
+op1P :: Parser Expression
 op1P = undefined
 
-op2P :: Parser Expression 
+op2P :: Parser Expression
 op2P = undefined
 
-listConstP :: Parser Expression 
+listConstP :: Parser Expression
 listConstP = undefined
 
-tupleConstP :: Parser Expression 
-tupleConstP = undefined 
+tupleConstP :: Parser Expression
+tupleConstP = undefined
 
-functionConstP :: Parser Expression 
-fucntionConstP = undefined 
+functionConstP :: Parser Expression
 
-ifP :: Parser Expression 
+fucntionConstP = undefined
+
+ifP :: Parser Expression
 ifP = undefined
 
 matchP :: Parser Expression
-matchP = undefined 
+matchP = undefined
 
-letP :: Parser Expression 
-letP = undefined 
+letP :: Parser Expression
+letP = undefined
 
---- Patterns 
-patternP :: Parser Pattern 
-patternP = undefined 
+--- Patterns
+patternP :: Parser Pattern
+patternP = undefined
 
 intConstPatP :: Parser Pattern
-intConstPatP = undefined 
+intConstPatP = undefined
 
-boolConstPatP :: Parser Pattern 
-boolConstPatP = undefined 
+boolConstPatP :: Parser Pattern
+boolConstPatP = undefined
 
 identifierPatP :: Parser Pattern
-indentifierPatP = undefined 
 
-listPatP :: Parser Pattern 
-listPatP = undefined 
+indentifierPatP = undefined
 
-consPatP :: Parser Pattern 
-consPatP = undefined 
+listPatP :: Parser Pattern
+listPatP = undefined
 
-tuplePatP :: Parser Pattern 
-tuplePatP = undefined 
+consPatP :: Parser Pattern
+consPatP = undefined
 
-wildcardPatP :: Parser Pattern 
-wildCardPatP = undefined 
+tuplePatP :: Parser Pattern
+tuplePatP = undefined
 
+wildcardPatP :: Parser Pattern
+
+wildCardPatP = undefined
 
 --- OPS
 
@@ -105,33 +108,33 @@ bopP :: Parser Bop
 bopP = undefined
 
 uopP :: Parser Uop
-uopP = undefined 
+uopP = undefined
 
---- statements 
+--- statements
 statementP :: Parser Statement
-statementP = functionDeclP <|> varDeclP <|> emptyP 
+statementP = functionDeclP <|> varDeclP <|> emptyP
 
 functionDeclP :: Parser Statement
 functionDeclP = undefined
 
 varDeclP :: Parser Statement
-varDeclP = undefined 
+varDeclP = undefined
 
 emptyP :: Parser Statement
-emptyP = undefined 
+emptyP = undefined
 
 blockP :: Parser Block
-blockP = undefined 
+blockP = undefined
 
 --- top level
 
 parseOcamlExp :: String -> Either P.ParseError Expression
-parseLuExp = undefined 
+
+parseLuExp = undefined
 
 parseOcamlStat :: String -> Either P.ParseError Statement
-parseLuStat = undefined 
+
+parseLuStat = undefined
 
 parseOcaml :: String -> IO (Either P.ParseError Block)
-parseOcaml = undefined 
-
-
+parseOcaml = undefined
