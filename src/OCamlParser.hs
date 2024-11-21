@@ -1,3 +1,10 @@
+<<<<<<< Updated upstream
+=======
+import Control.Exception (PatternMatchFail)
+import GHC.Base (undefined, (<|>))
+import GHC.Generics (Par1)
+import OCamlPrettyPrinter
+>>>>>>> Stashed changes
 import OCamlSyntax
 import GHC.Base (undefined, (<|>), many)
 import Control.Exception (PatternMatchFail)
