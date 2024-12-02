@@ -67,44 +67,33 @@ instance PP Expression where
   pp (Op1 Neg e) = PP.char '-' <> pp e
   pp (Op1 Not e) = PP.text "not" <+> pp e
   pp (Op2 e1 op e2) = pp e1 <+> pp op <+> pp e2
-  pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.char ',') (pp <$> l))
-  pp (TupleConst l) = undefined
-  pp (FunctionConst l e) = undefined
-  pp (If e1 e2 e3) = undefined
-  pp (Match e l) = undefined
-  pp (Let i e1 e2) = undefined
-  pp (Apply f a) = undefined
+  pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
+  pp (TupleConst l) = PP.parens $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
+  pp (FunctionConst i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
+  pp (If e1 e2 e3) = PP.text "if" <+> pp e1 <+> PP.text "then" <+> pp e2 <+> PP.text "else" <+> pp e3
+  pp (Match e l) = PP.text "begin match" <+> pp e <+> PP.text "with" <+> printList l  where
+    printList :: [(Pattern, Expression)] -> Doc
+    printList [] = PP.text ""
+    printList ((p, e) : xs) = PP.char '|' <+> pp p <+> PP.text "->" <+> pp e PP.$+$ printList xs
+  pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" <+> pp e2
+  pp (Apply f a) = pp f <+> pp a
 
 instance PP Pattern where
   pp :: Pattern -> Doc
-  pp (IntConstPat i) = undefined
-  pp (BoolConstPat b) = undefined
-  pp (IdentifierPat i) = undefined
-  pp (ListPat l) = undefined
-  pp (ConsPat p1 p2) = undefined
-  pp (TuplePat l) = undefined
-  pp WildcardPat = undefined
+  pp (IntConstPat i) = pp i
+  pp (BoolConstPat b) = pp b
+  pp (IdentifierPat i) = pp i
+  pp (ListPat l) = PP.brackets $ PP.hcat (PP.punctuate (PP.char ';') (pp <$> l))
+  pp (ConsPat p1 p2) = pp p1 <> PP.text "::" <> pp p2
+  pp (TuplePat l) = PP.parens $ PP.hcat (PP.punctuate (PP.char ',') (pp <$> l))
+  pp WildcardPat = PP.char '_'
 
 instance PP Statement where
   pp :: Statement -> Doc
-  pp (VarDecl b i e) = undefined
-  pp Empty = undefined
-
--- level :: Bop -> Int
--- level Times = 7
--- level Divide = 7
--- level Plus = 5
--- level Minus = 5
--- level Append = 4
--- level Cons = 4
--- level _ = 3 -- comparison and boolean operators
-
--- isBase :: Expression -> Bool
--- isBase TableConst {} = True
--- isBase Val {} = True
--- isBase Var {} = True
--- isBase Op1 {} = True
--- isBase _ = False
+  pp (VarDecl b i e) = PP.text "let " <> eval b <> PP.space <> pp i <> PP.space <> PP.char '=' <> PP.space <> pp e where
+    eval :: Bool -> Doc
+    eval b = if b then PP.text "rec " else PP.text ""
+  pp Empty = PP.char ';'
 
 instance Arbitrary Block where
   arbitrary :: Gen Block

@@ -47,6 +47,9 @@ boolValP = BoolVal <$> parseBool
   where
     parseBool = P.choice [constP "true" True, constP "false" False]
 
+litValP :: Parser Value
+litValP = intValP <|> boolValP
+
 tupleValP :: Parser Value
 tupleValP = undefined
 
