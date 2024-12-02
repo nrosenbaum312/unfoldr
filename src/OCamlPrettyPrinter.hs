@@ -1,9 +1,11 @@
+module OCamlPrettyPrinter where
+
+import Data.List
+import OCamlSyntax
+import Test.QuickCheck as QC
+import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
-import Data.List
-import Test.QuickCheck as QC
-import qualified Test.QuickCheck as QC
-import OCamlSyntax
 
 class PP a where
   pp :: a -> Doc
@@ -71,6 +73,7 @@ instance PP Expression where
   pp (If e1 e2 e3) = undefined
   pp (Match e l) = undefined
   pp (Let i e1 e2) = undefined
+  pp (Apply f a) = undefined
 
 instance PP Pattern where
   pp :: Pattern -> Doc
@@ -84,8 +87,7 @@ instance PP Pattern where
 
 instance PP Statement where
   pp :: Statement -> Doc
-  pp (FunctionDecl b i l e) = undefined
-  pp (VarDecl i e) = undefined
+  pp (VarDecl b i e) = undefined
   pp Empty = undefined
 
 -- level :: Bop -> Int
@@ -112,10 +114,9 @@ instance Arbitrary Block where
 
 instance Arbitrary Value where
   arbitrary :: Gen Value
-  arbitrary = 
+  arbitrary =
     QC.oneof
-      [
-        IntVal <$> arbitrary,
+      [ IntVal <$> arbitrary,
         BoolVal <$> arbitrary
       ]
   shrink :: Value -> [Value]

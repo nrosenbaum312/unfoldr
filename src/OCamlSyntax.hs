@@ -28,7 +28,7 @@ data Value
   | BoolVal Bool -- false, true
   | TupleVal [Value] -- (1, 2)
   | ListVal [Value] -- [1; 2]
-  | FunctionVal [Identifier] Expression -- fun x -> x * 2
+  | FunctionVal Identifier Expression -- fun x -> x * 2 * y
   deriving (Eq, Show)
 
 type Scope = Map Identifier Value
@@ -40,10 +40,11 @@ data Expression
   | Op2 Expression Bop Expression -- binary operators
   | ListConst [Expression] -- list construction, like [1; 2; 3]
   | TupleConst [Expression] -- tuple construction, like (1, 2, 3)
-  | FunctionConst [Identifier] Expression -- function construction, like fun x -> x * 2
+  | FunctionConst Identifier Expression -- function construction, like fun x -> x * 2
   | If Expression Expression Expression -- If Expression then Expression else Expression
   | Match Expression [(Pattern, Expression)] -- match expression, like match x with | [] -> 1 | x::xs -> 2
   | Let Identifier Expression Expression -- let identifier = expression in expression
+  | Apply Expression Expression -- function application, like f x
   deriving (Eq, Show)
 
 data Pattern
@@ -55,6 +56,11 @@ data Pattern
   | TuplePat [Pattern] -- match a tuple (e.g., (x, y))
   | WildcardPat -- match anything (underscore `_`)
   deriving (Show, Eq)
+
+-- take a pattern, take a value, and figure out a substitution, then apply
+-- the substitution.
+
+-- substitution
 
 data Uop
   = Neg -- `-` :: Int -> Int
@@ -79,8 +85,7 @@ data Bop
   deriving (Eq, Show, Enum, Bounded)
 
 data Statement
-  = FunctionDecl Bool Identifier [Identifier] Expression
-  | VarDecl Identifier Expression
+  = VarDecl Bool Identifier Expression
   | Empty -- ';'
   deriving (Eq, Show)
 
