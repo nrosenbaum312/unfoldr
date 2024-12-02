@@ -19,15 +19,33 @@ prop_roundtrip_exp e = parse expP (pretty e) == Right e
 prop_roundtrip_stat :: Statement -> Bool
 prop_roundtrip_stat s = parse statementP (pretty s) == Right s
 
+-- Helper Parsers
+wsP :: Parser a -> Parser a
+wsP p = p <* many P.space
+
+parens :: Parser a -> Parser a
+parens x = P.between (P.char '(') x (P.char ')')
+
+brackets :: Parser a -> Parser a
+brackets x = P.between (stringP "[") x (stringP "]")
+
+constP :: String -> a -> Parser a
+constP s x = x <$ wsP (P.string s)
+
+stringP :: String -> Parser ()
+stringP s = constP s ()
+
 --- Values
 valueP :: Parser Value
 valueP = intValP <|> boolValP <|> tupleValP <|> listValP <|> functionValP
 
 intValP :: Parser Value
-intValP = undefined
+intValP = IntVal <$> wsP P.int
 
 boolValP :: Parser Value
-boolValP = undefined
+boolValP = BoolVal <$> parseBool
+  where
+    parseBool = P.choice [constP "true" True, constP "false" False]
 
 tupleValP :: Parser Value
 tupleValP = undefined
@@ -48,6 +66,8 @@ test_value =
         P.parse listValP "[1; 2; 3]" ~?= Right (ListVal [IntVal 1, IntVal 2, IntVal 3]),
         P.parse functionValP "fun x -> x + 1" ~?= Right (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 1))))
       ]
+
+-- >>> runTestTT test_value
 
 --- Identifier
 idP :: Parser Identifier
