@@ -13,16 +13,16 @@ import Test.QuickCheck qualified as QC
 import Text.Read (readMaybe)
 
 -- make an empty scope
-makeScope :: OCamlSyntax.Scope
+makeScope :: Scope
 makeScope = Map.empty
 
 -- add a binding to a scope
 addBinding :: Identifier -> Value -> Scope -> Scope
-addBinding = undefined
+addBinding = Map.insert
 
 -- look up a variable in a scope
 resolveId :: Identifier -> Scope -> Maybe Value
-resolveId = undefined
+resolveId = Map.lookup
 
 evalExpression :: Expression -> State Scope Value
 evalExpression = undefined

@@ -43,12 +43,9 @@ intValP :: Parser Value
 intValP = IntVal <$> wsP P.int
 
 boolValP :: Parser Value
-boolValP = BoolVal <$> parseBool
+boolValP = BoolVal <$> wsP parseBool
   where
     parseBool = P.choice [constP "true" True, constP "false" False]
-
-litValP :: Parser Value
-litValP = intValP <|> boolValP
 
 tupleValP :: Parser Value
 tupleValP = undefined
@@ -71,6 +68,7 @@ test_value =
       ]
 
 -- >>> runTestTT test_value
+-- Counts {cases = 5, tried = 5, errors = 3, failures = 0}
 
 --- Identifier
 idP :: Parser Identifier
