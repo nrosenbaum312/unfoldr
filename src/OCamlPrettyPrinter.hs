@@ -67,7 +67,6 @@ instance PP Value where
 
 instance PP Expression where
   pp :: Expression -> Doc
-  pp (Var i) = pp i
   pp (Val v) = pp v
   pp (Op1 Neg e) = PP.char '-' <> pp e
   pp (Op1 Not e) = PP.text "not" <+> pp e
@@ -82,6 +81,7 @@ instance PP Expression where
     printList ((p, e) : xs) = PP.char '|' <+> pp p <+> PP.text "->" <+> pp e PP.$+$ printList xs
   pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$+$ pp e2
   pp (Apply f a) = pp f <+> pp a
+  pp i = pp i
 
 instance PP Pattern where
   pp :: Pattern -> Doc

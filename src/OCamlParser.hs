@@ -7,6 +7,7 @@ import OCamlPrettyPrinter
 import OCamlSyntax
 import Parser as P
 import Test.HUnit
+import qualified Data.Char as Char
 
 --- quickCheck properties that ensures that parsing is the inverse of printing
 
@@ -35,6 +36,25 @@ constP s x = x <$ wsP (P.string s)
 stringP :: String -> Parser ()
 stringP s = constP s ()
 
+reserved :: [String]
+reserved =
+  [ "do",
+    "else",
+    "end",
+    "false",
+    "if",
+    "in",
+    "not",
+    "then",
+    "true",
+    "fun",
+    "fold",
+    "transform",
+    "begin",
+    "match",
+    "let"
+  ]
+
 --- Values
 valueP :: Parser Value
 valueP = intValP <|> boolValP <|> tupleValP <|> listValP <|> functionValP
@@ -48,13 +68,13 @@ boolValP = BoolVal <$> wsP parseBool
     parseBool = P.choice [constP "true" True, constP "false" False]
 
 tupleValP :: Parser Value
-tupleValP = undefined
+tupleValP = TupleVal <$> parens (wsP valueP `P.sepBy1` wsP (P.char ','))
 
 listValP :: Parser Value
-listValP = undefined
+listValP = ListVal <$> brackets (wsP valueP `P.sepBy1` wsP (P.char ';'))
 
 functionValP :: Parser Value
-functionValP = undefined
+functionValP = FunctionVal <$> (wsP (stringP "fun") *> wsP idP <* wsP (stringP "->")) <*> expP
 
 test_value :: Test
 test_value =
@@ -68,21 +88,36 @@ test_value =
       ]
 
 -- >>> runTestTT test_value
--- Counts {cases = 5, tried = 5, errors = 3, failures = 0}
+-- Counts {cases = 5, tried = 5, errors = 1, failures = 1}
+
+-- >>> P.parse functionValP "fun x -> x + 1"
+-- Prelude.undefined
 
 --- Identifier
 idP :: Parser Identifier
-idP = undefined
+idP = P.filter (`notElem` reserved) (wsP ((:) <$> (P.satisfy Char.isAlpha <|> P.char '_') <*>
+  many (P.satisfy Char.isAlphaNum <|> P.char '_')))
 
 --- Expressions
 expP :: Parser Expression
-expP = undefined
+expP = choice [
+  varP,
+  valP,
+  op1P,
+  op2P,
+  listConstP,
+  tupleConstP,
+  functionConstP,
+  ifP,
+  matchP,
+  letP
+  ]
 
 varP :: Parser Expression
-varP = undefined
+varP = Var <$> idP
 
 valP :: Parser Expression
-valP = undefined
+valP = Val <$> (intValP <|> boolValP)
 
 op1P :: Parser Expression
 op1P = undefined
@@ -91,10 +126,12 @@ op2P :: Parser Expression
 op2P = undefined
 
 listConstP :: Parser Expression
-listConstP = undefined
+listConstP = ListConst <$> listValP
+
+-- >>> P.parse listConstP "[1; 2; 3]"
 
 tupleConstP :: Parser Expression
-tupleConstP = undefined
+tupleConstP = TupleConst <$> tupleValP
 
 functionConstP :: Parser Expression
 functionConstP = undefined

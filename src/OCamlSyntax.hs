@@ -34,7 +34,7 @@ data Value
 type Scope = Map Identifier Value
 
 data Expression
-  = Var Identifier -- variables, in any scope
+  = Identifier -- variables, in any scope
   | Val Value -- literal values
   | Op1 Uop Expression -- unary operators
   | Op2 Expression Bop Expression -- binary operators
