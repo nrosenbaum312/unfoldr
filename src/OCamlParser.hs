@@ -73,6 +73,7 @@ tupleValP = TupleVal <$> parens (wsP valueP `P.sepBy1` wsP (P.char ','))
 listValP :: Parser Value
 listValP = ListVal <$> brackets (wsP valueP `P.sepBy1` wsP (P.char ';'))
 
+-- what do we do if it's fun x y -> x
 functionValP :: Parser Value
 functionValP = FunctionVal <$> (wsP (stringP "fun") *> wsP idP <* wsP (stringP "->")) <*> expP
 
@@ -120,11 +121,29 @@ valP :: Parser Expression
 valP = Val <$> (intValP <|> boolValP)
 
 op1P :: Parser Expression
-op1P = Op1 <$> uopP <*> expP
+op1P = baseP <|> Op1 <$> uopP <*> op1P 
+
+baseP = valP            -- Parse literal values
+  <|> varP              -- Parse variable identifiers
+  <|> parens expP <|> listConstP 
 
 op2P :: Parser Expression
-op2P = undefined
+op2P = compP
+  where
+    compP = catP `P.chainl1` opAtLevel (level Gt)
+    catP = sumP `P.chainl1` opAtLevel (level Append)
+    sumP = prodP `P.chainl1` opAtLevel (level Plus)
+    prodP = op1P `P.chainl1` opAtLevel (level Times)
 
+
+opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
+opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
+
+-- >>> P.parse op2P "3 + 4 * 2"
+-- Right (Op2 (Val (IntVal 3)) Plus (Op2 (Val (IntVal 4)) Times (Val (IntVal 2))))
+
+-- >>> P.parse op2P "1 :: [2; 3]"
+-- Right (Val (IntVal 1))
 listConstP :: Parser Expression
 listConstP = ListConst <$> brackets (wsP expP `P.sepBy1` wsP (P.char ';'))
 
@@ -176,34 +195,25 @@ test_expression =
 
 --- Patterns
 patternP :: Parser Pattern
-patternP = wsP (P.char '|') *> choice [
-  intConstPatP,
-  boolConstPatP,
-  listPatP,
-  consPatP,
-  tuplePatP,
-  identifierPatP
-  ]
+patternP = undefined
 
 intConstPatP :: Parser Pattern
-intConstPatP = IntConstPat <$> wsP P.int
+intConstPatP = undefined
 
 boolConstPatP :: Parser Pattern
-boolConstPatP = BoolConstPat <$> wsP parseBool
-  where
-    parseBool = P.choice [constP "true" True, constP "false" False]
+boolConstPatP = undefined
 
 identifierPatP :: Parser Pattern
-identifierPatP = IdentifierPat <$> idP
+identifierPatP = undefined
 
 listPatP :: Parser Pattern
-listPatP = ListPat <$> brackets (wsP patternP `P.sepBy1` wsP (P.char ';'))
+listPatP = undefined
 
 consPatP :: Parser Pattern
-consPatP = ConsPat <$> wsP patternP <*> (wsP (stringP "::") *> patternP)
+consPatP = undefined
 
 tuplePatP :: Parser Pattern
-tuplePatP = TuplePat <$> parens (wsP patternP `P.sepBy1` wsP (P.char ','))
+tuplePatP = undefined
 
 wildcardPatP :: Parser Pattern
 wildcardPatP = undefined
@@ -212,17 +222,14 @@ test_pattern :: Test
 test_pattern =
   "parsing patterns"
     ~: TestList
-      [ P.parse patternP "| 42" ~?= Right (IntConstPat 42),
-        P.parse patternP "| true" ~?= Right (BoolConstPat True),
-        P.parse patternP "| x" ~?= Right (IdentifierPat "x"),
-        P.parse patternP "| [x; y; z]" ~?= Right (ListPat [IdentifierPat "x", IdentifierPat "y", IdentifierPat "z"]),
-        P.parse patternP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
-        P.parse patternP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
-        P.parse patternP "| _" ~?= Right WildcardPat
+      [ P.parse intConstPatP "| 42" ~?= Right (IntConstPat 42),
+        P.parse boolConstPatP "| true" ~?= Right (BoolConstPat True),
+        P.parse identifierPatP "| x" ~?= Right (IdentifierPat "x"),
+        P.parse listPatP "| [x; y; z]" ~?= Right (ListPat [IdentifierPat "x", IdentifierPat "y", IdentifierPat "z"]),
+        P.parse consPatP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
+        P.parse tuplePatP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
+        P.parse wildcardPatP "| _" ~?= Right WildcardPat
       ]
-
--- >>> P.parse patternP "| x::xs"
--- Right (IdentifierPat "x")
 
 --- OPS
 
