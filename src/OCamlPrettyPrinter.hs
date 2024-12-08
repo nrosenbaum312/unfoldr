@@ -52,13 +52,18 @@ instance PP String where
   pp :: String -> Doc
   pp = PP.text
 
+printList :: [Value] -> Doc
+printList [] = PP.text ""
+printList [x] = pp x
+printList (x : xs) = pp x <> PP.text ", " <> printList xs
+
 instance PP Value where
   pp :: Value -> Doc
   pp (IntVal i) = pp i
   pp (BoolVal b) = pp b
-  pp (TupleVal t) = PP.parens $ PP.text (intercalate ", " (map show t))
-  pp (ListVal l) = PP.brackets $ PP.text (intercalate ";" (map show l))
-  pp (FunctionVal is e) = PP.text "fun" <+> PP.text (unwords (map show is)) <+> PP.text "->" <+> pp e
+  pp (TupleVal t) = PP.parens $ printList t
+  pp (ListVal l) = PP.brackets $ printList l
+  pp (FunctionVal i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
 
 instance PP Expression where
   pp :: Expression -> Doc
@@ -67,15 +72,15 @@ instance PP Expression where
   pp (Op1 Neg e) = PP.char '-' <> pp e
   pp (Op1 Not e) = PP.text "not" <+> pp e
   pp (Op2 e1 op e2) = pp e1 <+> pp op <+> pp e2
-  pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
+  pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text "; ") (pp <$> l))
   pp (TupleConst l) = PP.parens $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
   pp (FunctionConst i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
   pp (If e1 e2 e3) = PP.text "if" <+> pp e1 <+> PP.text "then" <+> pp e2 <+> PP.text "else" <+> pp e3
   pp (Match e l) = PP.text "begin match" <+> pp e <+> PP.text "with" <+> printList l  where
     printList :: [(Pattern, Expression)] -> Doc
-    printList [] = PP.text ""
+    printList [] = PP.text "end"
     printList ((p, e) : xs) = PP.char '|' <+> pp p <+> PP.text "->" <+> pp e PP.$+$ printList xs
-  pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" <+> pp e2
+  pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$+$ pp e2
   pp (Apply f a) = pp f <+> pp a
 
 instance PP Pattern where
