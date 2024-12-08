@@ -212,10 +212,12 @@ test_pattern =
 --- OPS
 
 bopP :: Parser Bop
-bopP = undefined
+bopP = wsP (Plus <$ P.char '+' <|> Minus <$ P.char '-' <|> Times <$ P.char '*' <|> Divide <$ P.string "/" <|> Mod <$ P.string "mod" 
+        <|> Eq <$ P.string "=" <|> Ge <$ P.string ">=" <|> Gt <$ P.char '>' <|> Le <$ P.string "<=" <|> Lt <$ P.char '<' <|> Append <$ P.char '@' <|> Cons <$ P.string "::" 
+        <|> Or <$ P.string "||" <|> And <$ P.string "&&")
 
 uopP :: Parser Uop
-uopP = undefined
+uopP = wsP (Neg <$ P.char '-' <|> Not <$ P.string "not")
 
 --- statements
 statementP :: Parser Statement
