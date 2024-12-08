@@ -120,7 +120,7 @@ valP :: Parser Expression
 valP = Val <$> (intValP <|> boolValP)
 
 op1P :: Parser Expression
-op1P = undefined
+op1P = Op1 <$> uopP <*> expP
 
 op2P :: Parser Expression
 op2P = undefined
