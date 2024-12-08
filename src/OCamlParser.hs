@@ -109,8 +109,8 @@ expP = choice [
   tupleConstP,
   functionConstP,
   ifP,
-  matchP,
-  letP
+  letP,
+  matchP
   ]
 
 varP :: Parser Expression
@@ -126,24 +126,25 @@ op2P :: Parser Expression
 op2P = undefined
 
 listConstP :: Parser Expression
-listConstP = ListConst <$> listValP
-
--- >>> P.parse listConstP "[1; 2; 3]"
+listConstP = ListConst <$> brackets (wsP expP `P.sepBy1` wsP (P.char ';'))
 
 tupleConstP :: Parser Expression
-tupleConstP = TupleConst <$> tupleValP
+tupleConstP = TupleConst <$> parens (wsP expP `P.sepBy1` wsP (P.char ','))
 
 functionConstP :: Parser Expression
 functionConstP = undefined
 
 ifP :: Parser Expression
-ifP = undefined
+ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*> (wsP (stringP "else") *> expP)
 
 matchP :: Parser Expression
 matchP = undefined
+  -- Match <$> ((wsP (stringP "match") *> idP <* wsP (stringP "with")))<*> many (patP) where
+  -- patP :: Parser (Pattern, Expression)
+  -- patP = undefined
 
 letP :: Parser Expression
-letP = undefined
+letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> expP <*> (wsP (stringP "in") *> expP)
 
 test_expression :: Test
 test_expression =
