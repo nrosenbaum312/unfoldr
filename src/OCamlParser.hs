@@ -176,25 +176,34 @@ test_expression =
 
 --- Patterns
 patternP :: Parser Pattern
-patternP = undefined
+patternP = wsP (P.char '|') *> choice [
+  intConstPatP,
+  boolConstPatP,
+  listPatP,
+  consPatP,
+  tuplePatP,
+  identifierPatP
+  ]
 
 intConstPatP :: Parser Pattern
-intConstPatP = undefined
+intConstPatP = IntConstPat <$> wsP P.int
 
 boolConstPatP :: Parser Pattern
-boolConstPatP = undefined
+boolConstPatP = BoolConstPat <$> wsP parseBool
+  where
+    parseBool = P.choice [constP "true" True, constP "false" False]
 
 identifierPatP :: Parser Pattern
-identifierPatP = undefined
+identifierPatP = IdentifierPat <$> idP
 
 listPatP :: Parser Pattern
-listPatP = undefined
+listPatP = ListPat <$> brackets (wsP patternP `P.sepBy1` wsP (P.char ';'))
 
 consPatP :: Parser Pattern
-consPatP = undefined
+consPatP = ConsPat <$> wsP patternP <*> (wsP (stringP "::") *> patternP)
 
 tuplePatP :: Parser Pattern
-tuplePatP = undefined
+tuplePatP = TuplePat <$> parens (wsP patternP `P.sepBy1` wsP (P.char ','))
 
 wildcardPatP :: Parser Pattern
 wildcardPatP = undefined
@@ -203,14 +212,17 @@ test_pattern :: Test
 test_pattern =
   "parsing patterns"
     ~: TestList
-      [ P.parse intConstPatP "| 42" ~?= Right (IntConstPat 42),
-        P.parse boolConstPatP "| true" ~?= Right (BoolConstPat True),
-        P.parse identifierPatP "| x" ~?= Right (IdentifierPat "x"),
-        P.parse listPatP "| [x; y; z]" ~?= Right (ListPat [IdentifierPat "x", IdentifierPat "y", IdentifierPat "z"]),
-        P.parse consPatP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
-        P.parse tuplePatP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
-        P.parse wildcardPatP "| _" ~?= Right WildcardPat
+      [ P.parse patternP "| 42" ~?= Right (IntConstPat 42),
+        P.parse patternP "| true" ~?= Right (BoolConstPat True),
+        P.parse patternP "| x" ~?= Right (IdentifierPat "x"),
+        P.parse patternP "| [x; y; z]" ~?= Right (ListPat [IdentifierPat "x", IdentifierPat "y", IdentifierPat "z"]),
+        P.parse patternP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
+        P.parse patternP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
+        P.parse patternP "| _" ~?= Right WildcardPat
       ]
+
+-- >>> P.parse patternP "| x::xs"
+-- Right (IdentifierPat "x")
 
 --- OPS
 
