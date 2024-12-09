@@ -8,6 +8,8 @@ import OCamlSyntax
 import Parser as P
 import Test.HUnit
 import qualified Data.Char as Char
+import System.IO (getContents)  -- For reading from standard input
+
 
 --- quickCheck properties that ensures that parsing is the inverse of printing
 
@@ -142,8 +144,12 @@ opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 -- >>> P.parse op2P "3 + 4 * 2"
 -- Right (Op2 (Val (IntVal 3)) Plus (Op2 (Val (IntVal 4)) Times (Val (IntVal 2))))
 
+-- >>> P.parse op2P "3 * 4 + 2"
+-- Right (Op2 (Op2 (Val (IntVal 3)) Times (Val (IntVal 4))) Plus (Val (IntVal 2)))
+
 -- >>> P.parse op2P "1 :: [2; 3]"
--- Right (Val (IntVal 1))
+-- Right (Op2 (Val (IntVal 1)) Cons (ListConst [Val (IntVal 2),Val (IntVal 3)]))
+
 listConstP :: Parser Expression
 listConstP = ListConst <$> brackets (wsP expP `P.sepBy1` wsP (P.char ';'))
 
@@ -256,27 +262,29 @@ uopP = wsP (Neg <$ P.char '-' <|> Not <$ P.string "not")
 
 --- statements
 statementP :: Parser Statement
-statementP = functionDeclP <|> varDeclP <|> emptyP
-
-functionDeclP :: Parser Statement
-functionDeclP = undefined
+statementP = varDeclP 
 
 varDeclP :: Parser Statement
-varDeclP = undefined
+varDeclP = VarDecl <$> wsP isRec <*> wsP idP <*> (wsP (P.char '=') *> wsP expP)
+  where
+    isRec = (True <$ wsP (P.string "let rec")) <|> (False <$ wsP (P.string "let"))
 
-emptyP :: Parser Statement
-emptyP = undefined
+-- >>> P.parse varDeclP "let rec x = 4"
+-- Right (VarDecl True "x" (Val (IntVal 4)))
 
 blockP :: Parser Block
-blockP = undefined
+blockP = Block <$> many (wsP statementP)
 
 --- top level
 
 parseOcamlExp :: String -> Either ParseError Expression
-parseOcamlExp = undefined
+parseOcamlExp = P.parse expP
 
 parseOcamlStat :: String -> Either ParseError Statement
-parseOcamlStat = undefined
+parseOcamlStat =  P.parse statementP
 
-parseOcaml :: String -> IO (Either ParseError Block)
-parseOcaml = undefined
+parseOcaml :: IO (Either ParseError Block)
+parseOcaml = do
+  input <- getContents
+  let result = P.parse (const <$> blockP <*> P.eof) input
+  return result
