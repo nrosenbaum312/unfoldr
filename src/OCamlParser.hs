@@ -9,6 +9,7 @@ import Parser as P
 import Test.HUnit
 import qualified Data.Char as Char
 import System.IO (getContents)  -- For reading from standard input
+import Test.QuickCheck as QC
 
 
 --- quickCheck properties that ensures that parsing is the inverse of printing
@@ -91,10 +92,10 @@ test_value =
       ]
 
 -- >>> runTestTT test_value
--- Counts {cases = 5, tried = 5, errors = 1, failures = 1}
+-- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
 
 -- >>> P.parse functionValP "fun x -> x + 1"
--- Prelude.undefined
+-- Right (FunctionVal "x" (Var "x"))
 
 --- Identifier
 idP :: Parser Identifier
@@ -123,11 +124,11 @@ valP :: Parser Expression
 valP = Val <$> (intValP <|> boolValP)
 
 op1P :: Parser Expression
-op1P = baseP <|> Op1 <$> uopP <*> op1P 
+op1P = baseP <|> Op1 <$> uopP <*> op1P
 
 baseP = valP            -- Parse literal values
   <|> varP              -- Parse variable identifiers
-  <|> parens expP <|> listConstP 
+  <|> parens expP <|> listConstP
 
 op2P :: Parser Expression
 op2P = compP
@@ -146,6 +147,9 @@ opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 
 -- >>> P.parse op2P "3 * 4 + 2"
 -- Right (Op2 (Op2 (Val (IntVal 3)) Times (Val (IntVal 4))) Plus (Val (IntVal 2)))
+
+-- >>> P.parse expP "x + 3"
+-- Right (Var "x")
 
 -- >>> P.parse op2P "1 :: [2; 3]"
 -- Right (Op2 (Val (IntVal 1)) Cons (ListConst [Val (IntVal 2),Val (IntVal 3)]))
@@ -199,16 +203,28 @@ test_expression =
             )
       ]
 
+
 --- Patterns
---- Patterns
-patternP :: Parser Pattern
-patternP = wsP (P.char '|') *> choice [
+topLevelpatternP :: Parser Pattern
+topLevelpatternP = wsP (P.char '|') *> choice [
   intConstPatP,
   boolConstPatP,
+  wildcardPatP,
+  identifierPatP,
   listPatP,
-  consPatP,
   tuplePatP,
-  identifierPatP
+  consPatP
+  ]
+
+otherPatternP :: Parser Pattern
+otherPatternP = choice [
+  intConstPatP,
+  boolConstPatP,
+  wildcardPatP,
+  identifierPatP,
+  listPatP,
+  tuplePatP,
+  consPatP
   ]
 
 intConstPatP :: Parser Pattern
@@ -223,38 +239,42 @@ identifierPatP :: Parser Pattern
 identifierPatP = IdentifierPat <$> idP
 
 listPatP :: Parser Pattern
-listPatP = ListPat <$> brackets (wsP patternP `P.sepBy1` wsP (P.char ';'))
+listPatP = ListPat <$> brackets (wsP otherPatternP `P.sepBy1` wsP (P.char ';'))
 
 consPatP :: Parser Pattern
-consPatP = ConsPat <$> wsP patternP <*> (wsP (stringP "::") *> patternP)
+consPatP = ConsPat <$> wsP otherPatternP <*> (wsP (stringP "::") *> wsP otherPatternP)
 
 tuplePatP :: Parser Pattern
-tuplePatP = TuplePat <$> parens (wsP patternP `P.sepBy1` wsP (P.char ','))
+tuplePatP = TuplePat <$> parens (wsP otherPatternP `P.sepBy1` wsP (P.char ','))
 
 wildcardPatP :: Parser Pattern
-wildcardPatP = undefined
+wildcardPatP = WildcardPat <$ wsP (P.char '_')
 
 test_pattern :: Test
 test_pattern =
   "parsing patterns"
     ~: TestList
-      [ P.parse patternP "| 42" ~?= Right (IntConstPat 42),
-        P.parse patternP "| true" ~?= Right (BoolConstPat True),
-        P.parse patternP "| x" ~?= Right (IdentifierPat "x"),
-        P.parse patternP "| [x; y; z]" ~?= Right (ListPat [IdentifierPat "x", IdentifierPat "y", IdentifierPat "z"]),
-        P.parse patternP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
-        P.parse patternP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
-        P.parse patternP "| _" ~?= Right WildcardPat
+      [ P.parse topLevelpatternP "| 42" ~?= Right (IntConstPat 42),
+        P.parse topLevelpatternP "| true" ~?= Right (BoolConstPat True),
+        P.parse topLevelpatternP "| x" ~?= Right (IdentifierPat "x"),
+        P.parse topLevelpatternP "| [1; y; z]" ~?= Right (ListPat [IntConstPat 1, IdentifierPat "y", IdentifierPat "z"]),
+        P.parse topLevelpatternP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")), 
+        P.parse topLevelpatternP "| x::xs::xss" ~?= Right (ConsPat (IdentifierPat "x") (ConsPat (IdentifierPat "xs") (IdentifierPat "xss"))),
+        P.parse topLevelpatternP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
+        P.parse topLevelpatternP "| _" ~?= Right WildcardPat
       ]
 
--- >>> P.parse patternP "| x::xs"
+-- stack overflow
+-- Counts {cases = 8, tried = 8, errors = 0, failures = 2}
+
+-- >>> P.parse topLevelpatternP "| x::xs::xss"
 -- Right (IdentifierPat "x")
 
 --- OPS
 
 bopP :: Parser Bop
-bopP = wsP (Plus <$ P.char '+' <|> Minus <$ P.char '-' <|> Times <$ P.char '*' <|> Divide <$ P.string "/" <|> Mod <$ P.string "mod" 
-        <|> Eq <$ P.string "=" <|> Ge <$ P.string ">=" <|> Gt <$ P.char '>' <|> Le <$ P.string "<=" <|> Lt <$ P.char '<' <|> Append <$ P.char '@' <|> Cons <$ P.string "::" 
+bopP = wsP (Plus <$ P.char '+' <|> Minus <$ P.char '-' <|> Times <$ P.char '*' <|> Divide <$ P.string "/" <|> Mod <$ P.string "mod"
+        <|> Eq <$ P.string "=" <|> Ge <$ P.string ">=" <|> Gt <$ P.char '>' <|> Le <$ P.string "<=" <|> Lt <$ P.char '<' <|> Append <$ P.char '@' <|> Cons <$ P.string "::"
         <|> Or <$ P.string "||" <|> And <$ P.string "&&")
 
 uopP :: Parser Uop
