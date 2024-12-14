@@ -1,7 +1,7 @@
 module OCamlParser where
 
 import Control.Exception (PatternMatchFail)
-import GHC.Base (many, undefined, (<|>))
+import GHC.Base (many, undefined, (<|>), liftA3)
 import GHC.Generics (Par1)
 import OCamlPrettyPrinter
 import OCamlSyntax
@@ -59,17 +59,16 @@ boolValP = BoolVal <$> wsP parseBool
     parseBool = P.choice [constP "true" True, constP "false" False]
 
 tupleValP :: Parser Value
-tupleValP = TupleVal <$> parens (wsP valueP `P.sepBy1` wsP (P.char ','))
+tupleValP = TupleVal <$> parens (wsP valueP `P.sepBy` wsP (P.char ','))
 
 listValP :: Parser Value
-listValP = ListVal <$> brackets (wsP valueP `P.sepBy1` wsP (P.char ';'))
+listValP = ListVal <$> brackets (wsP valueP `P.sepBy` wsP (P.char ';'))
 
 -- what do we do if it's fun x y -> x
 functionValP :: Parser Value
 functionValP = FunctionVal <$> (wsP (stringP "fun") *> wsP idP <* wsP (stringP "->")) <*> expP
 
--- >>> P.parse functionValP "fun x -> x + 1"
--- Right (FunctionVal "x" (Var "x"))
+-- >>> P.parse functionValP "fun x y -> x + 1"
 
 --- Identifier
 idP :: Parser Identifier
@@ -79,16 +78,16 @@ idP = P.filter (`notElem` reserved) (wsP ((:) <$> (P.satisfy Char.isAlpha <|> P.
 --- Expressions
 expP :: Parser Expression
 expP = choice [
-  varP,
-  valP,
-  op1P,
   op2P,
+  op1P,
   listConstP,
   tupleConstP,
   functionConstP,
   ifP,
   letP,
-  matchP
+  matchP,
+  varP,
+  valP
   ]
 
 varP :: Parser Expression
@@ -113,27 +112,14 @@ op2P = compP
     sumP = prodP `P.chainl1` opAtLevel (level Plus)
     prodP = op1P `P.chainl1` opAtLevel (level Times)
 
-
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 
--- >>> P.parse op2P "3 + 4 * 2"
--- Right (Op2 (Val (IntVal 3)) Plus (Op2 (Val (IntVal 4)) Times (Val (IntVal 2))))
-
--- >>> P.parse op2P "3 * 4 + 2"
--- Right (Op2 (Op2 (Val (IntVal 3)) Times (Val (IntVal 4))) Plus (Val (IntVal 2)))
-
--- >>> P.parse expP "x + 3"
--- Right (Var "x")
-
--- >>> P.parse op2P "1 :: [2; 3]"
--- Right (Op2 (Val (IntVal 1)) Cons (ListConst [Val (IntVal 2),Val (IntVal 3)]))
-
 listConstP :: Parser Expression
-listConstP = ListConst <$> brackets (wsP expP `P.sepBy1` wsP (P.char ';'))
+listConstP = ListConst <$> brackets (wsP expP `P.sepBy` wsP (P.char ';'))
 
 tupleConstP :: Parser Expression
-tupleConstP = TupleConst <$> parens (wsP expP `P.sepBy1` wsP (P.char ','))
+tupleConstP = TupleConst <$> parens (wsP expP `P.sepBy` wsP (P.char ','))
 
 functionConstP :: Parser Expression
 functionConstP = FunctionConst <$> (wsP (stringP "fun") *> idP) <*> expP
@@ -142,25 +128,24 @@ ifP :: Parser Expression
 ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*> (wsP (stringP "else") *> expP)
 
 matchP :: Parser Expression
-matchP = undefined
-  -- Match <$> ((wsP (stringP "match") *> idP <* wsP (stringP "with")))<*> many (patP) where
-  -- patP :: Parser (Pattern, Expression)
-  -- patP = undefined
+matchP = Match 
+    <$> (wsP (stringP "begin match") *> wsP expP <* wsP (stringP "with")) 
+    <*> many (wsP patExpP) where
+  patExpP :: Parser (Pattern, Expression)
+  patExpP = wsP (liftA2 (,) (wsP topLevelPatternP) (wsP (stringP "->") *> wsP expP))
 
 letP :: Parser Expression
 letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> expP <*> (wsP (stringP "in") *> expP)
 
-
 --- Patterns
-topLevelpatternP :: Parser Pattern
-topLevelpatternP = wsP (P.char '|') *> choice [
-  intConstPatP,
-  boolConstPatP,
-  wildcardPatP,
-  identifierPatP,
-  listPatP,
-  tuplePatP,
-  consPatP
+topLevelPatternP :: Parser Pattern
+topLevelPatternP = wsP (P.char '|') *> choice [ intConstPatP,
+    boolConstPatP,
+    wildcardPatP,
+    listPatP,
+    tuplePatP,
+    consPatP,
+    identifierPatP
   ]
 
 otherPatternP :: Parser Pattern
@@ -168,10 +153,9 @@ otherPatternP = choice [
   intConstPatP,
   boolConstPatP,
   wildcardPatP,
-  identifierPatP,
   listPatP,
   tuplePatP,
-  consPatP
+  identifierPatP
   ]
 
 intConstPatP :: Parser Pattern
@@ -186,19 +170,19 @@ identifierPatP :: Parser Pattern
 identifierPatP = IdentifierPat <$> idP
 
 listPatP :: Parser Pattern
-listPatP = ListPat <$> brackets (wsP otherPatternP `P.sepBy1` wsP (P.char ';'))
+listPatP = ListPat <$> brackets (wsP otherPatternP `P.sepBy` wsP (P.char ';'))
 
 consPatP :: Parser Pattern
-consPatP = ConsPat <$> wsP otherPatternP <*> (wsP (stringP "::") *> wsP otherPatternP)
+consPatP = otherPatternP `P.chainl1` consOp
+  where
+    consOp = ConsPat <$ wsP (stringP "::")
 
 tuplePatP :: Parser Pattern
-tuplePatP = TuplePat <$> parens (wsP otherPatternP `P.sepBy1` wsP (P.char ','))
+tuplePatP = TuplePat <$> parens (wsP otherPatternP `P.sepBy` wsP (P.char ','))
 
 wildcardPatP :: Parser Pattern
 wildcardPatP = WildcardPat <$ wsP (P.char '_')
 
--- >>> P.parse topLevelpatternP "| x::xs::xss"
--- Right (IdentifierPat "x")
 
 --- OPS
 
@@ -218,9 +202,6 @@ varDeclP :: Parser Statement
 varDeclP = VarDecl <$> wsP isRec <*> wsP idP <*> (wsP (P.char '=') *> wsP expP)
   where
     isRec = (True <$ wsP (P.string "let rec")) <|> (False <$ wsP (P.string "let"))
-
--- >>> P.parse varDeclP "let rec x = 4"
--- Right (VarDecl True "x" (Val (IntVal 4)))
 
 blockP :: Parser Block
 blockP = Block <$> many (wsP statementP)
