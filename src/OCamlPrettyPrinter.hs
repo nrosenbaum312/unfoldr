@@ -67,6 +67,7 @@ instance PP Value where
 
 instance PP Expression where
   pp :: Expression -> Doc
+  pp (Var i) = pp i
   pp (Val v) = pp v
   pp (Op1 Neg e) = PP.char '-' <> pp e
   pp (Op1 Not e) = PP.text "not" <+> pp e
@@ -81,7 +82,6 @@ instance PP Expression where
     printList ((p, e) : xs) = PP.char '|' <+> pp p <+> PP.text "->" <+> pp e PP.$+$ printList xs
   pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$+$ pp e2
   pp (Apply f a) = pp f <+> pp a
-  pp i = pp i
 
 instance PP Pattern where
   pp :: Pattern -> Doc
@@ -95,9 +95,9 @@ instance PP Pattern where
 
 instance PP Statement where
   pp :: Statement -> Doc
-  pp (VarDecl b i e) = PP.text "let " <> eval b <> PP.space <> pp i <> PP.space <> PP.char '=' <> PP.space <> pp e where
+  pp (VarDecl b i e) = PP.text "let" <> eval b <> PP.space <> pp i <> PP.text " = " <> pp e where
     eval :: Bool -> Doc
-    eval b = if b then PP.text "rec " else PP.text ""
+    eval b = if b then PP.text " rec" else PP.text ""
   pp Empty = PP.char ';'
 
 -- Arbitrary Instances
@@ -113,8 +113,8 @@ instance Arbitrary Value where
         BoolVal <$> arbitrary
       ]
   shrink :: Value -> [Value]
-  shrink (IntVal i) = IntVal <$> shrink i
-  shrink (BoolVal b) = BoolVal <$> shrink b
+  shrink i@(IntVal _i) = return i
+  shrink b@(BoolVal _b) = return b
   shrink _ = []
 
 
@@ -138,7 +138,7 @@ genExp n =
       (n, Op1 <$> arbitrary <*> genExp n'),
       (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
       (n, ListConst <$> genExpList n'),
-      -- (n, TupleConst <$> genExpList n'),
+      (n, TupleConst <$> genExpList n'),
       (n, FunctionConst <$> genId <*> genExp n'),
       -- (n, Match <$> genExp n' <*> genPatExpList n'),
       (n, Let <$> genId <*> genExp n' <*> genExp n'),

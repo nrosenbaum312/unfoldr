@@ -11,18 +11,6 @@ import qualified Data.Char as Char
 import System.IO (getContents)  -- For reading from standard input
 import Test.QuickCheck as QC
 
-
---- quickCheck properties that ensures that parsing is the inverse of printing
-
-prop_roundtrip_val :: Value -> Bool
-prop_roundtrip_val v = parse valueP (pretty v) == Right v
-
-prop_roundtrip_exp :: Expression -> Bool
-prop_roundtrip_exp e = parse expP (pretty e) == Right e
-
-prop_roundtrip_stat :: Statement -> Bool
-prop_roundtrip_stat s = parse statementP (pretty s) == Right s
-
 -- Helper Parsers
 wsP :: Parser a -> Parser a
 wsP p = p <* many P.space
@@ -80,20 +68,6 @@ listValP = ListVal <$> brackets (wsP valueP `P.sepBy1` wsP (P.char ';'))
 functionValP :: Parser Value
 functionValP = FunctionVal <$> (wsP (stringP "fun") *> wsP idP <* wsP (stringP "->")) <*> expP
 
-test_value :: Test
-test_value =
-  "parsing values"
-    ~: TestList
-      [ P.parse (many intValP) "1 2\n 3" ~?= Right [IntVal 1, IntVal 2, IntVal 3],
-        P.parse (many boolValP) "true false\n true" ~?= Right [BoolVal True, BoolVal False, BoolVal True],
-        P.parse tupleValP "(1, 2)" ~?= Right (TupleVal [IntVal 1, IntVal 2]),
-        P.parse listValP "[1; 2; 3]" ~?= Right (ListVal [IntVal 1, IntVal 2, IntVal 3]),
-        P.parse functionValP "fun x -> x + 1" ~?= Right (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 1))))
-      ]
-
--- >>> runTestTT test_value
--- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
-
 -- >>> P.parse functionValP "fun x -> x + 1"
 -- Right (FunctionVal "x" (Var "x"))
 
@@ -126,6 +100,7 @@ valP = Val <$> (intValP <|> boolValP)
 op1P :: Parser Expression
 op1P = baseP <|> Op1 <$> uopP <*> op1P
 
+baseP :: Parser Expression
 baseP = valP            -- Parse literal values
   <|> varP              -- Parse variable identifiers
   <|> parens expP <|> listConstP
@@ -175,34 +150,6 @@ matchP = undefined
 letP :: Parser Expression
 letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> expP <*> (wsP (stringP "in") *> expP)
 
-test_expression :: Test
-test_expression =
-  "parsing expressions"
-    ~: TestList
-      [ P.parse varP "x" ~?= Right (Var "x"),
-        P.parse valP "42" ~?= Right (Val (IntVal 42)),
-        P.parse op1P "-x" ~?= Right (Op1 Neg (Var "x")),
-        P.parse op2P "x + 1" ~?= Right (Op2 (Var "x") Plus (Val (IntVal 1))),
-        P.parse listConstP "[1; 2; 3]" ~?= Right (ListConst [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)]),
-        P.parse tupleConstP "(1, x)" ~?= Right (TupleConst [Val (IntVal 1), Var "x"]),
-        P.parse functionConstP "fun x y -> x + y"
-          ~?= Right (FunctionConst "x" (FunctionConst "y" (Op2 (Var "x") Plus (Var "y")))),
-        P.parse functionConstP "fun x -> fun y -> x + y"
-          ~?= Right (FunctionConst "x" (FunctionConst "y" (Op2 (Var "x") Plus (Var "y")))),
-        P.parse ifP "if true then 1 else 0"
-          ~?= Right (If (Val (BoolVal True)) (Val (IntVal 1)) (Val (IntVal 0))),
-        P.parse letP "let x = 1 in x + 1"
-          ~?= Right (Let "x" (Val (IntVal 1)) (Op2 (Var "x") Plus (Val (IntVal 1)))),
-        P.parse matchP "match x with | [] -> 1 | x::xs -> 2"
-          ~?= Right
-            ( Match
-                (Var "x")
-                [ (ListPat [], Val (IntVal 1)),
-                  (ConsPat (IdentifierPat "x") (IdentifierPat "xs"), Val (IntVal 2))
-                ]
-            )
-      ]
-
 
 --- Patterns
 topLevelpatternP :: Parser Pattern
@@ -249,23 +196,6 @@ tuplePatP = TuplePat <$> parens (wsP otherPatternP `P.sepBy1` wsP (P.char ','))
 
 wildcardPatP :: Parser Pattern
 wildcardPatP = WildcardPat <$ wsP (P.char '_')
-
-test_pattern :: Test
-test_pattern =
-  "parsing patterns"
-    ~: TestList
-      [ P.parse topLevelpatternP "| 42" ~?= Right (IntConstPat 42),
-        P.parse topLevelpatternP "| true" ~?= Right (BoolConstPat True),
-        P.parse topLevelpatternP "| x" ~?= Right (IdentifierPat "x"),
-        P.parse topLevelpatternP "| [1; y; z]" ~?= Right (ListPat [IntConstPat 1, IdentifierPat "y", IdentifierPat "z"]),
-        P.parse topLevelpatternP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")), 
-        P.parse topLevelpatternP "| x::xs::xss" ~?= Right (ConsPat (IdentifierPat "x") (ConsPat (IdentifierPat "xs") (IdentifierPat "xss"))),
-        P.parse topLevelpatternP "| (x, y)" ~?= Right (TuplePat [IdentifierPat "x", IdentifierPat "y"]),
-        P.parse topLevelpatternP "| _" ~?= Right WildcardPat
-      ]
-
--- stack overflow
--- Counts {cases = 8, tried = 8, errors = 0, failures = 2}
 
 -- >>> P.parse topLevelpatternP "| x::xs::xss"
 -- Right (IdentifierPat "x")

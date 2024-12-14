@@ -45,13 +45,27 @@ test_print_patterns =
   "printing patterns"
     ~: TestList
       [
-        pretty (IntConstPat 1) ~?= "1"
+        pretty (IntConstPat 1) ~?= "1",
+        pretty (BoolConstPat False) ~?= "false",
+        pretty (IdentifierPat "X") ~?= "X",
+        pretty (ListPat [IdentifierPat "X", IntConstPat 1]) ~?= "[X;1]",
+        pretty (TuplePat [IdentifierPat "X", IntConstPat 1]) ~?= "(X,1)",
+        pretty (ConsPat (IdentifierPat "x") (IdentifierPat "xs")) ~?= "x::xs",
+        pretty WildcardPat ~?= "_"
       ]
+
+-- >>> runTestTT test_print_patterns
+-- Counts {cases = 7, tried = 7, errors = 0, failures = 0}
 
 test_print_statement :: Test
 test_print_statement =
   "printing statements"
     ~: TestList
       [
-        
+        pretty (VarDecl True "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) ~?= "let rec x = x + 2",
+        pretty (VarDecl False "y" (If (Val (BoolVal True)) (Val (IntVal 20)) (TupleConst [Val (IntVal 10), Val (IntVal 20)])))
+          ~?= "let y = if true then 20 else (10, 20)"
       ]
+
+-- >>> runTestTT test_print_statement
+-- Counts {cases = 2, tried = 2, errors = 0, failures = 0}
