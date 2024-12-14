@@ -69,9 +69,12 @@ functionValP =
   foldParams <$> (wsP (stringP "fun") *> some (wsP idP)) <*> (wsP (stringP "->") *> expP)
   where
     foldParams :: [Identifier] -> Expression -> Value
-    foldParams [param] body = FunctionVal param body
-    foldParams (param : rest) body = FunctionVal param (foldr FunctionConst body rest)
-    foldParams [] _ = error "Function with no parameters is invalid"
+    foldParams [] _ = error "No params"
+    foldParams [x] ex = FunctionVal x ex
+    foldParams (x : xs) ex = FunctionVal x (foldr FunctionConst ex xs)
+
+-- >>> P.parse functionValP "fun x y z -> x + 1"
+-- Right (FunctionVal "x" (FunctionConst "y" (FunctionConst "z" (Op2 (Var "x") Plus (Val (IntVal 1))))))
 
 
 --- Identifiers
@@ -131,7 +134,9 @@ functionConstP =
   foldParams <$> (wsP (stringP "fun") *> some (wsP idP)) <*> (wsP (stringP "->") *> expP)
   where
     foldParams :: [Identifier] -> Expression -> Expression
-    foldParams params body = foldr FunctionConst body params
+    foldParams [] _  = error "No params"
+    foldParams [x] ex = FunctionConst x ex
+    foldParams (x : xs) ex = FunctionConst x (foldr FunctionConst ex xs)
 
 ifP :: Parser Expression
 ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*> (wsP (stringP "else") *> expP)
@@ -240,7 +245,8 @@ complicated and strange edge cases. The quickcheck props aren't super useful cuz
 instances are like rather buggy (I mostly just followed how they did them in hw5 but need to take
 another look). So like for our part of the project I would just test and debug all of the parsers here
 and then if you could look at the arbitrary instances in the OCamlPrettyPrinter file that would be lit.
-Otherwise I think our stuff is like pretty good and almost finished.
+Otherwise I think our stuff is like pretty good and almost finished. So just kinda pulling everything together
+is the last big thing. So like oh do the top level ones work also.
 
 Text me with any questions although I will be traveling for most of the morning and then I'll be drunk
 
