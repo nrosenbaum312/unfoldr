@@ -1,7 +1,7 @@
 module OCamlParser where
 
 import Control.Exception (PatternMatchFail)
-import GHC.Base (many, undefined, (<|>), liftA3)
+import GHC.Base (many, undefined, (<|>), liftA3, some)
 import GHC.Generics (Par1)
 import OCamlPrettyPrinter
 import OCamlSyntax
@@ -64,16 +64,21 @@ tupleValP = TupleVal <$> parens (wsP valueP `P.sepBy` wsP (P.char ','))
 listValP :: Parser Value
 listValP = ListVal <$> brackets (wsP valueP `P.sepBy` wsP (P.char ';'))
 
--- what do we do if it's fun x y -> x
 functionValP :: Parser Value
-functionValP = FunctionVal <$> (wsP (stringP "fun") *> wsP idP <* wsP (stringP "->")) <*> expP
+functionValP =
+  foldParams <$> (wsP (stringP "fun") *> some (wsP idP)) <*> (wsP (stringP "->") *> expP)
+  where
+    foldParams :: [Identifier] -> Expression -> Value
+    foldParams [param] body = FunctionVal param body
+    foldParams (param : rest) body = FunctionVal param (foldr FunctionConst body rest)
+    foldParams [] _ = error "Function with no parameters is invalid"
 
--- >>> P.parse functionValP "fun x y -> x + 1"
 
---- Identifier
+--- Identifiers
 idP :: Parser Identifier
 idP = P.filter (`notElem` reserved) (wsP ((:) <$> (P.satisfy Char.isAlpha <|> P.char '_') <*>
   many (P.satisfy Char.isAlphaNum <|> P.char '_')))
+
 
 --- Expressions
 expP :: Parser Expression
@@ -122,7 +127,11 @@ tupleConstP :: Parser Expression
 tupleConstP = TupleConst <$> parens (wsP expP `P.sepBy` wsP (P.char ','))
 
 functionConstP :: Parser Expression
-functionConstP = FunctionConst <$> (wsP (stringP "fun") *> idP) <*> expP
+functionConstP =
+  foldParams <$> (wsP (stringP "fun") *> some (wsP idP)) <*> (wsP (stringP "->") *> expP)
+  where
+    foldParams :: [Identifier] -> Expression -> Expression
+    foldParams params body = foldr FunctionConst body params
 
 ifP :: Parser Expression
 ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*> (wsP (stringP "else") *> expP)
@@ -136,6 +145,7 @@ matchP = Match
 
 letP :: Parser Expression
 letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> expP <*> (wsP (stringP "in") *> expP)
+
 
 --- Patterns
 topLevelPatternP :: Parser Pattern
@@ -185,7 +195,6 @@ wildcardPatP = WildcardPat <$ wsP (P.char '_')
 
 
 --- OPS
-
 bopP :: Parser Bop
 bopP = wsP (Plus <$ P.char '+' <|> Minus <$ P.char '-' <|> Times <$ P.char '*' <|> Divide <$ P.string "/" <|> Mod <$ P.string "mod"
         <|> Eq <$ P.string "=" <|> Ge <$ P.string ">=" <|> Gt <$ P.char '>' <|> Le <$ P.string "<=" <|> Lt <$ P.char '<' <|> Append <$ P.char '@' <|> Cons <$ P.string "::"
@@ -193,6 +202,7 @@ bopP = wsP (Plus <$ P.char '+' <|> Minus <$ P.char '-' <|> Times <$ P.char '*' <
 
 uopP :: Parser Uop
 uopP = wsP (Neg <$ P.char '-' <|> Not <$ P.string "not")
+
 
 --- statements
 statementP :: Parser Statement
@@ -206,8 +216,8 @@ varDeclP = VarDecl <$> wsP isRec <*> wsP idP <*> (wsP (P.char '=') *> wsP expP)
 blockP :: Parser Block
 blockP = Block <$> many (wsP statementP)
 
---- top level
 
+--- top level
 parseOcamlExp :: String -> Either ParseError Expression
 parseOcamlExp = P.parse expP
 
@@ -219,3 +229,20 @@ parseOcaml = do
   input <- getContents
   let result = P.parse (const <$> blockP <*> P.eof) input
   return result
+
+
+{--
+
+Ok hello future natalie this is evan
+ok basically everything in this file is implemented and from my general testing seems to work
+I would just like heavy unit test everything like really really make sure shit works even with
+complicated and strange edge cases. The quickcheck props aren't super useful cuz the arbitrary
+instances are like rather buggy (I mostly just followed how they did them in hw5 but need to take
+another look). So like for our part of the project I would just test and debug all of the parsers here
+and then if you could look at the arbitrary instances in the OCamlPrettyPrinter file that would be lit.
+Otherwise I think our stuff is like pretty good and almost finished.
+
+Text me with any questions although I will be traveling for most of the morning and then I'll be drunk
+
+XOXO evan
+--}
