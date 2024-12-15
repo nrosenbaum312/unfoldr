@@ -277,3 +277,6 @@ instance Arbitrary Block where
   arbitrary = QC.sized genBlock
   shrink :: Block -> [Block]
   shrink (Block ss) = [Block ss' | ss' <- shrink ss]
+
+-- >>> pretty (Apply (Op1 Neg (Val (BoolVal False))) (Op1 Neg (Val (BoolVal False))))
+-- "-(false) -(false)"

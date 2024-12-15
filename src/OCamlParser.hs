@@ -78,8 +78,7 @@ idP :: Parser Identifier
 idP = P.filter (`notElem` reserved) (wsP ((:) <$> (P.satisfy Char.isAlpha <|> P.char '_') <*>
   many (P.satisfy Char.isAlphaNum <|> P.char '_')))
 
-
--- Expressions
+-- Expression
 
 varP :: Parser Expression
 varP = Var <$> idP
@@ -94,8 +93,16 @@ expP = compP
     catP = sumP `P.chainl1` opAtLevel (level Append)
     sumP = prodP `P.chainl1` opAtLevel (level Plus)
     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
-    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP 
-    baseP = wsP (parens expP) <|> listConstP <|> tupleConstP <|> functionConstP <|> ifP <|> letP <|> matchP <|> varP <|> valP
+    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
+    baseP = wsP (parens expP) 
+        <|> choice [listConstP,
+                    tupleConstP,
+                    functionConstP,
+                    ifP,
+                    letP,
+                    matchP,
+                    varP,
+                    valP]
 
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
@@ -104,7 +111,9 @@ listConstP :: Parser Expression
 listConstP = ListConst <$> brackets (wsP expP `P.sepBy` wsP (P.char ';'))
 
 tupleConstP :: Parser Expression
-tupleConstP = TupleConst <$> parens (wsP expP `P.sepBy` wsP (P.char ','))
+tupleConstP = TupleConst <$> parens (wsP (tupleItemsP `P.sepBy` wsP (P.char ',')) <|> pure [])
+  where
+    tupleItemsP = tupleConstP <|> expP
 
 functionConstP :: Parser Expression
 functionConstP =
@@ -128,6 +137,8 @@ matchP = Match
 letP :: Parser Expression
 letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> expP <*> (wsP (stringP "in") *> expP)
 
+applyP :: Parser Expression
+applyP = Apply <$> wsP expP <*> wsP expP
 
 --- Patterns
 topLevelPatternP :: Parser Pattern
@@ -183,7 +194,8 @@ bopP = wsP (Plus <$ P.char '+' <|> Minus <$ P.char '-' <|> Times <$ P.char '*' <
         <|> Or <$ P.string "||" <|> And <$ P.string "&&")
 
 uopP :: Parser Uop
-uopP = P.choice[ constP "-" Neg, constP "not" Not]
+uopP =  P.choice [constP "-" Neg, constP "not" Not]
+
 
 --- statements
 statementP :: Parser Statement
@@ -210,49 +222,3 @@ parseOcaml = do
   input <- getContents
   let result = P.parse (const <$> blockP <*> P.eof) input
   return result
-
-
-{--
-
-Ok hello future natalie this is evan
-ok basically everything in this file is implemented and from my general testing seems to work
-I would just like heavy unit test everything like really really make sure shit works even with
-complicated and strange edge cases. The quickcheck props aren't super useful cuz the arbitrary
-instances are like rather buggy (I mostly just followed how they did them in hw5 but need to take
-another look). So like for our part of the project I would just test and debug all of the parsers here
-and then if you could look at the arbitrary instances in the OCamlPrettyPrinter file that would be lit.
-Otherwise I think our stuff is like pretty good and almost finished. So just kinda pulling everything together
-is the last big thing. So like oh do the top level ones work also.
-
-Text me with any questions although I will be traveling for most of the morning and then I'll be drunk
-
-XOXO evan
---}
-
-prop_roundtrip_val :: Value -> Bool
-prop_roundtrip_val v = parse valueP (pretty v) == Right v
-
-prop_roundtrip_exp :: Expression -> Bool
-prop_roundtrip_exp e = parse expP (pretty e) == Right e
-
-prop_roundtrip_stat :: Statement -> Bool
-prop_roundtrip_stat s = parse statementP (pretty s) == Right s
-
-
--- >>> P.parse (many expP) "(1 + 2) * 3"
--- Right [Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))]
-
--- Op2 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))) Times (Val (IntVal 3))
-
--- >>> P.parse expP "1 * (2 + 3)"
--- Right (Op2 (Val (IntVal 1)) Times (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3))))
-
--- >>> P.parse expP "(1+2)"
--- Right (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2)))
-
-
--- >>> pretty (TupleConst [TupleConst [Val (BoolVal False),Val (IntVal 1),Var "X0"]])
--- "((false, 1, X0))"
-
--- >>> P.parse expP "((false, 1, X0))"
--- Right (TupleConst [Val (BoolVal False),Val (IntVal 1),Var "X0"])
