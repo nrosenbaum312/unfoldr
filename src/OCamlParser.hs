@@ -3,7 +3,7 @@ module OCamlParser where
 import Control.Exception (PatternMatchFail)
 import GHC.Base (many, undefined, (<|>), liftA3, some)
 import GHC.Generics (Par1)
-import OCamlPrettyPrinter
+import OCamlPrettyPrinter as PP
 import OCamlSyntax
 import Parser as P
 import Test.HUnit
@@ -94,8 +94,8 @@ expP = compP
     sumP = prodP `P.chainl1` opAtLevel (level Plus)
     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
     uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
-    baseP = wsP (parens expP) 
-        <|> choice [listConstP,
+    baseP = choice [wsP (parens expP),
+                    listConstP,
                     tupleConstP,
                     functionConstP,
                     ifP,
@@ -222,3 +222,18 @@ parseOcaml = do
   input <- getContents
   let result = P.parse (const <$> blockP <*> P.eof) input
   return result
+
+prop_roundtrip_exp :: Expression -> Bool
+prop_roundtrip_exp e = parse expP (pretty e) == Right e
+
+-- >>> PP.pretty (Op1 Not (Var "x0"))
+-- "not (x0)"
+
+-- >>> P.parse expP "not (x0)"
+-- Right (Op1 Not (TupleConst [Var "x0"]))
+
+-- >>> PP.pretty (Op2 (Op2 (Var "y") Ge (Var "X0")) Eq (Op2 (Var "X") Le (Val (IntVal 2))))
+-- "y >= X0 = X <= 2"
+
+-- >>> P.parse expP "y >= X0 = X <= 2"
+-- Right (Op2 (Op2 (Op2 (Var "y") Ge (Var "X0")) Eq (Var "X")) Le (Val (IntVal 2)))

@@ -3,8 +3,16 @@ import OCamlParser
 import Control.Exception (PatternMatchFail)
 import GHC.Base (many, undefined, (<|>))
 import GHC.Generics (Par1)
-import OCamlPrettyPrinter
+import OCamlPrettyPrinter as PP
 import OCamlSyntax
+    ( Bop(Plus, Or, Times),
+      Expression(Val, ListConst, TupleConst, FunctionConst, If, Let,
+                 Match, Op1, Var, Op2),
+      Pattern(IdentifierPat, BoolConstPat, WildcardPat, ListPat,
+              TuplePat, IntConstPat, ConsPat),
+      Statement,
+      Uop(Not, Neg),
+      Value(..) )
 import Parser as P
 import Test.HUnit
 import qualified Data.Char as Char
@@ -125,4 +133,3 @@ test_pattern =
 
 -- >>> runTestTT test_pattern
 -- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
-
