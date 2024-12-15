@@ -2,6 +2,7 @@ module OCamlStepper where
 
 import Control.Monad (foldM, forM, mapM, unless, when, zipWithM)
 import Data.Bifunctor (second)
+import Data.Either
 import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
@@ -11,6 +12,7 @@ import OCamlSyntax
 import OCamlTypes
 import State
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
+import Test.QuickCheck (Property)
 import Test.QuickCheck qualified as QC
 import Text.Read (readMaybe)
 
@@ -93,6 +95,21 @@ data Step e v
 
 type ExpressionStep = Step Expression Value
 
+stepExpToValue :: Expression -> Either String Value
+stepExpToValue (Val v) = Right v
+stepExpToValue e =
+  let s' = largeStepExp e
+   in case evalState s' makeScope of
+        Left s -> Left s
+        Right e' -> stepExpToValue e'
+
+stepGoodExpToExp :: Expression -> Expression
+stepGoodExpToExp e =
+  let s' = largeStepExp e
+   in case evalState s' makeScope of
+        Left s -> error "Undefined expression generated in test!"
+        Right e' -> e'
+
 stepExpN :: Int -> Expression -> State Scope (Either String Expression)
 stepExpN 0 e = return $ Right e
 stepExpN i e = do
@@ -139,6 +156,9 @@ stepExp (Apply fn arg) = stepApply fn arg
 
 -- >>> State.runState (stepExpN 3 (If (Op2 (Op1 Neg (Val (IntVal 1))) Eq (Val (IntVal (-1)))) (Val (IntVal 10)) (Val (IntVal 20)))) makeScope
 -- (Right (Val (IntVal 10)),fromList [])
+
+-- >>> stepExpToValue (If (Op2 (Op1 Neg (Val (IntVal 1))) Eq (Val (IntVal (-1)))) (Val (IntVal 10)) (Val (IntVal 20)))
+-- Right (IntVal 10)
 
 -- Evaluates a variable expression by attempting to look up the variable in the
 -- scope.
@@ -316,6 +336,10 @@ stepMatch e arms = do
     Right (Large e'') -> return $ Right $ Large (Match e'' arms)
     Right (Final v) -> return $ Right $ Large (Match (Val v) arms)
     _ -> return e'
+
+prop_steppingDoesNotModifyValue :: Expression -> Property
+prop_steppingDoesNotModifyValue e =
+  isRight (stepExpToValue e) QC.==> stepExpToValue (stepGoodExpToExp e) == stepExpToValue e
 
 {-
 
