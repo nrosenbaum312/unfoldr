@@ -79,19 +79,7 @@ idP = P.filter (`notElem` reserved) (wsP ((:) <$> (P.satisfy Char.isAlpha <|> P.
   many (P.satisfy Char.isAlphaNum <|> P.char '_')))
 
 
---- Expressions
--- expP :: Parser Expression
--- expP = choice [
-  -- opP,
-  -- listConstP,
-  -- tupleConstP,
-  -- functionConstP,
-  -- ifP,
-  -- letP,
-  -- matchP,
-  -- varP,
-  -- valP
-  -- ]
+-- Expressions
 
 varP :: Parser Expression
 varP = Var <$> idP
@@ -106,60 +94,11 @@ expP = compP
     catP = sumP `P.chainl1` opAtLevel (level Append)
     sumP = prodP `P.chainl1` opAtLevel (level Plus)
     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
-    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
-    baseP = parens expP 
-        <|> choice [listConstP,
-                    tupleConstP,
-                    functionConstP,
-                    ifP,
-                    letP,
-                    matchP,
-                    varP,
-                    valP]
-
--- >>> P.parse expP "(1 + 2) * 3"
--- Right (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2)))
-
-
--- baseP :: Parser Expression
--- baseP = varP              -- Parse variable identifiers
---   <|> parens expP
---   <|> valP            -- Parse literal values
---   <|> listConstP
-
--- op2P :: Parser Expression
--- op2P = compP
---   where
---     compP = catP `P.chainl1` opAtLevel (level Gt)
---     catP = sumP `P.chainl1` opAtLevel (level Append)
---     sumP = prodP `P.chainl1` opAtLevel (level Plus)
---     prodP = op1P `P.chainl1` opAtLevel (level Times)
+    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP 
+    baseP = wsP (parens expP) <|> listConstP <|> tupleConstP <|> functionConstP <|> ifP <|> letP <|> matchP <|> varP <|> valP
 
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
-
-
--- expP :: Parser Expression
--- expP = compP
---   where
---     compP = catP `P.chainl1` opAtLevel (level Gt)
---     catP = sumP `P.chainl1` opAtLevel (level Concat)
---     sumP = prodP `P.chainl1` opAtLevel (level Plus)
---     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
---     uopexpP =
---       baseP
---         <|> Op1 <$> uopP <*> uopexpP
---     baseP =
---       tableConstP
---         <|> Var <$> varP
---         <|> parens expP
---         <|> Val <$> valueP
-
--- -- | Parse an operator at a specified precedence level
--- opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
--- opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
-
-
 
 listConstP :: Parser Expression
 listConstP = ListConst <$> brackets (wsP expP `P.sepBy` wsP (P.char ';'))
@@ -244,8 +183,7 @@ bopP = wsP (Plus <$ P.char '+' <|> Minus <$ P.char '-' <|> Times <$ P.char '*' <
         <|> Or <$ P.string "||" <|> And <$ P.string "&&")
 
 uopP :: Parser Uop
-uopP = wsP (Neg <$ P.char '-' <|> Not <$ P.string "not")
-
+uopP = P.choice[ constP "-" Neg, constP "not" Not]
 
 --- statements
 statementP :: Parser Statement

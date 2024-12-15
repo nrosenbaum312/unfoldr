@@ -92,6 +92,7 @@ data Statement
 level :: Bop -> Int
 level Times = 7
 level Divide = 7
+level Mod = 7
 level Plus = 5
 level Minus = 5
 level Append = 4

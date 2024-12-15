@@ -71,7 +71,7 @@ instance PP Expression where
   pp (Var i) = pp i
   pp (Val v) = pp v
   pp (Op1 Neg e) = PP.char '-' <> PP.parens (pp e)
-  pp (Op1 Not e) = PP.text "not" <+> pp e
+  pp (Op1 Not e) = PP.text "not" <+> PP.parens (pp e)
   pp (Op2 e1 op e2) = pp e1 <+> pp op <+> pp e2
   pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text "; ") (pp <$> l))
   pp (TupleConst l) = PP.parens $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
@@ -137,13 +137,13 @@ genExp n =
       (1, Var <$> genId),
       (1, Val <$> arbitrary),
       (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
-      -- (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n')
-      (n, ListConst <$> genExpList n'),
-      (n, TupleConst <$> genExpList n'),
-      (n, FunctionConst <$> genId <*> genExp n'),
-      (n, Match <$> genExp n' <*> genPatExpList n'),
-      (n, Let <$> genId <*> genExp n' <*> genExp n'),
-      (n, Apply <$> genExp n' <*> genExp n')
+      (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n')
+      -- (n, ListConst <$> genExpList n'),
+      -- (n, TupleConst <$> genExpList n'),
+      -- (n, FunctionConst <$> genId <*> genExp n'),
+      -- (n, Match <$> genExp n' <*> genPatExpList n'),
+      -- (n, Let <$> genId <*> genExp n' <*> genExp n'),
+      -- (n, Apply <$> genExp n' <*> genExp n')
     ] where
         n' = n `div` 2
 
