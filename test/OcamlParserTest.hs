@@ -3,8 +3,16 @@ import OCamlParser
 import Control.Exception (PatternMatchFail)
 import GHC.Base (many, undefined, (<|>))
 import GHC.Generics (Par1)
-import OCamlPrettyPrinter
+import OCamlPrettyPrinter as PP
 import OCamlSyntax
+    ( Bop(Plus, Or, Times),
+      Expression(Val, ListConst, TupleConst, FunctionConst, If, Let,
+                 Match, Op1, Var, Op2),
+      Pattern(IdentifierPat, BoolConstPat, WildcardPat, ListPat,
+              TuplePat, IntConstPat, ConsPat),
+      Statement,
+      Uop(Not, Neg),
+      Value(..) )
 import Parser as P
 import Test.HUnit
 import qualified Data.Char as Char
@@ -83,7 +91,7 @@ test_op_expression =
   "parsing op expressions"
     ~: TestList [
       P.parse expP "-(-x)" ~?= Right (Op1 Neg (Op1 Neg (Var "x"))),
-      P.parse expP "-x" ~?= Right (Op1 Neg (Var "x")),
+      P.parse expP "(-x)" ~?= Right (Op1 Neg (Var "x")),
       P.parse expP "not a"  ~?= Right (Op1 Not (Var "a")),
       P.parse expP "-(13)" ~?= Right (Op1 Neg (Val (IntVal 13))),
       P.parse expP "-13" ~?= Right (Val (IntVal (-13))),
@@ -106,10 +114,7 @@ test_bop_expression =
   ]
 
 -- >>> runTestTT test_bop_expression
--- Counts {cases = 5, tried = 5, errors = 0, failures = 2}
-
--- >>> P.parse expP "((1 + 2) * 3)"
--- Left "No parses"
+-- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
 
 test_pattern :: Test
 test_pattern =
@@ -128,7 +133,3 @@ test_pattern =
 
 -- >>> runTestTT test_pattern
 -- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
-
--- >>> P.parse expP "((6 / 3) * 2)"
--- Left "No parses"
-

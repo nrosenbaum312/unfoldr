@@ -71,7 +71,7 @@ instance PP Expression where
   pp (Var i) = pp i
   pp (Val v) = pp v
   pp (Op1 Neg e) = PP.char '-' <> PP.parens (pp e)
-  pp (Op1 Not e) = PP.text "not" <+> pp e
+  pp (Op1 Not e) = PP.text "not" <+> PP.parens (pp e)
   pp (Op2 e1 op e2) = pp e1 <+> pp op <+> pp e2
   pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text "; ") (pp <$> l))
   pp (TupleConst l) = PP.parens $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
@@ -137,7 +137,7 @@ genExp n =
       (1, Var <$> genId),
       (1, Val <$> arbitrary),
       (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
-      -- (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n')
+      (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
       (n, ListConst <$> genExpList n'),
       (n, TupleConst <$> genExpList n'),
       (n, FunctionConst <$> genId <*> genExp n'),
@@ -146,38 +146,6 @@ genExp n =
       (n, Apply <$> genExp n' <*> genExp n')
     ] where
         n' = n `div` 2
-
--- instance Arbitrary Expression where
---   arbitrary :: Gen Expression
---   arbitrary = QC.sized genExp
---   shrink :: Expression -> [Expression]
---   shrink va@(Var v) = [va]
---   shrink (Val v) = Val <$> shrink v
---   shrink (Op1 o e) = [Op1 o e] 
---   -- : [Op1 o e' | e' <- shrink e]
---   shrink (Op2 e1 o e2) = [e1, e2]
---   -- shrink (Op2 e1 o e2) = e1 : e2
---   --   : [Op2 e1' o e2 | e1' <- shrink e1]
---   --   ++ [Op2 e1 o e2' | e2' <- shrink e2]
---   shrink (ListConst l) = 
---     [ListConst l' | l' <- shrink l]
---   shrink (TupleConst l) = 
---     [TupleConst l' | l' <- shrink l]
---   shrink (FunctionConst i e) = e :
---     [FunctionConst i e' | e' <- shrink e]
---   shrink (If e b1 b2) = b1 : b2 
---     : [If e' b1 b2 | e' <- shrink e]
---     ++ [If e b1' b2 | b1' <- shrink b1]
---     ++ [If e b1 b2' | b2' <- shrink b2]
---   shrink (Match e l) = e :
---     [Match e' l | e' <- shrink e]
---     ++ [Match e l' | l' <- shrink l]
---   shrink (Let i e1 e2) = e1 : e2
---     : [Let i e1' e2 | e1' <- shrink e1]
---     ++ [Let i e1 e2' | e2' <- shrink e2]
---   shrink (Apply e1 e2) = e1 : e2
---     : [Apply e1' e2 | e1' <- shrink e1]
---     ++ [Apply e1 e2' | e2' <- shrink e2]
 
 instance Arbitrary Expression where
   arbitrary :: Gen Expression
