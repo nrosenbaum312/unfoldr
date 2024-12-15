@@ -73,10 +73,6 @@ functionValP =
     foldParams [x] ex = FunctionVal x ex
     foldParams (x : xs) ex = FunctionVal x (foldr FunctionConst ex xs)
 
--- >>> P.parse functionValP "fun x y z -> x + 1"
--- Right (FunctionVal "x" (FunctionConst "y" (FunctionConst "z" (Op2 (Var "x") Plus (Val (IntVal 1))))))
-
-
 --- Identifiers
 idP :: Parser Identifier
 idP = P.filter (`notElem` reserved) (wsP ((:) <$> (P.satisfy Char.isAlpha <|> P.char '_') <*>
@@ -84,19 +80,18 @@ idP = P.filter (`notElem` reserved) (wsP ((:) <$> (P.satisfy Char.isAlpha <|> P.
 
 
 --- Expressions
-expP :: Parser Expression
-expP = choice [
-  op2P,
-  op1P,
-  listConstP,
-  tupleConstP,
-  functionConstP,
-  ifP,
-  letP,
-  matchP,
-  varP,
-  valP
-  ]
+-- expP :: Parser Expression
+-- expP = choice [
+  -- opP,
+  -- listConstP,
+  -- tupleConstP,
+  -- functionConstP,
+  -- ifP,
+  -- letP,
+  -- matchP,
+  -- varP,
+  -- valP
+  -- ]
 
 varP :: Parser Expression
 varP = Var <$> idP
@@ -104,24 +99,67 @@ varP = Var <$> idP
 valP :: Parser Expression
 valP = Val <$> (intValP <|> boolValP)
 
-op1P :: Parser Expression
-op1P = baseP <|> Op1 <$> uopP <*> op1P
-
-baseP :: Parser Expression
-baseP = valP            -- Parse literal values
-  <|> varP              -- Parse variable identifiers
-  <|> parens expP <|> listConstP
-
-op2P :: Parser Expression
-op2P = compP
+expP :: Parser Expression
+expP = compP
   where
     compP = catP `P.chainl1` opAtLevel (level Gt)
     catP = sumP `P.chainl1` opAtLevel (level Append)
     sumP = prodP `P.chainl1` opAtLevel (level Plus)
-    prodP = op1P `P.chainl1` opAtLevel (level Times)
+    prodP = uopexpP `P.chainl1` opAtLevel (level Times)
+    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
+    baseP = parens expP 
+        <|> choice [listConstP,
+                    tupleConstP,
+                    functionConstP,
+                    ifP,
+                    letP,
+                    matchP,
+                    varP,
+                    valP]
+
+-- >>> P.parse expP "(1 + 2) * 3"
+-- Right (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2)))
+
+
+-- baseP :: Parser Expression
+-- baseP = varP              -- Parse variable identifiers
+--   <|> parens expP
+--   <|> valP            -- Parse literal values
+--   <|> listConstP
+
+-- op2P :: Parser Expression
+-- op2P = compP
+--   where
+--     compP = catP `P.chainl1` opAtLevel (level Gt)
+--     catP = sumP `P.chainl1` opAtLevel (level Append)
+--     sumP = prodP `P.chainl1` opAtLevel (level Plus)
+--     prodP = op1P `P.chainl1` opAtLevel (level Times)
 
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
+
+
+-- expP :: Parser Expression
+-- expP = compP
+--   where
+--     compP = catP `P.chainl1` opAtLevel (level Gt)
+--     catP = sumP `P.chainl1` opAtLevel (level Concat)
+--     sumP = prodP `P.chainl1` opAtLevel (level Plus)
+--     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
+--     uopexpP =
+--       baseP
+--         <|> Op1 <$> uopP <*> uopexpP
+--     baseP =
+--       tableConstP
+--         <|> Var <$> varP
+--         <|> parens expP
+--         <|> Val <$> valueP
+
+-- -- | Parse an operator at a specified precedence level
+-- opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
+-- opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
+
+
 
 listConstP :: Parser Expression
 listConstP = ListConst <$> brackets (wsP expP `P.sepBy` wsP (P.char ';'))
@@ -252,3 +290,31 @@ Text me with any questions although I will be traveling for most of the morning 
 
 XOXO evan
 --}
+
+prop_roundtrip_val :: Value -> Bool
+prop_roundtrip_val v = parse valueP (pretty v) == Right v
+
+prop_roundtrip_exp :: Expression -> Bool
+prop_roundtrip_exp e = parse expP (pretty e) == Right e
+
+prop_roundtrip_stat :: Statement -> Bool
+prop_roundtrip_stat s = parse statementP (pretty s) == Right s
+
+
+-- >>> P.parse (many expP) "(1 + 2) * 3"
+-- Right [Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))]
+
+-- Op2 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))) Times (Val (IntVal 3))
+
+-- >>> P.parse expP "1 * (2 + 3)"
+-- Right (Op2 (Val (IntVal 1)) Times (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3))))
+
+-- >>> P.parse expP "(1+2)"
+-- Right (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2)))
+
+
+-- >>> pretty (TupleConst [TupleConst [Val (BoolVal False),Val (IntVal 1),Var "X0"]])
+-- "((false, 1, X0))"
+
+-- >>> P.parse expP "((false, 1, X0))"
+-- Right (TupleConst [Val (BoolVal False),Val (IntVal 1),Var "X0"])

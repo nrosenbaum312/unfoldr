@@ -1,3 +1,4 @@
+module OcamlParserTest where
 import OCamlParser
 import Control.Exception (PatternMatchFail)
 import GHC.Base (many, undefined, (<|>))
@@ -28,12 +29,22 @@ test_value =
       [ P.parse (many intValP) "1 2\n 3" ~?= Right [IntVal 1, IntVal 2, IntVal 3],
         P.parse (many boolValP) "true false\n true" ~?= Right [BoolVal True, BoolVal False, BoolVal True],
         P.parse tupleValP "(1, 2)" ~?= Right (TupleVal [IntVal 1, IntVal 2]),
-        P.parse listValP "[1; 2; 3]" ~?= Right (ListVal [IntVal 1, IntVal 2, IntVal 3]),
-        P.parse functionValP "fun x -> x + 1" ~?= Right (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 1))))
+        P.parse listValP "[1; 2; 3]" ~?= Right (ListVal [IntVal 1, IntVal 2, IntVal 3])
       ]
 
 -- >>> runTestTT test_value
+-- Counts {cases = 4, tried = 4, errors = 0, failures = 0}
 
+test_functionVal :: Test
+test_functionVal =
+  "parsing functionVals"
+    ~: TestList
+      [ P.parse functionValP "fun x -> x + 1" ~?= Right (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 1)))),
+      P.parse functionValP "fun x y z -> x + 1" ~?=  Right (FunctionVal "x" (FunctionConst "y" (FunctionConst "z" (Op2 (Var "x") Plus (Val (IntVal 1))))))]
+
+
+-- >>> runTestTT test_functionVal
+-- Counts {cases = 2, tried = 2, errors = 0, failures = 0}
 
 test_expression :: Test
 test_expression =
@@ -44,6 +55,7 @@ test_expression =
         P.parse expP "-x" ~?= Right (Op1 Neg (Var "x")),
         P.parse expP "x + 1" ~?= Right (Op2 (Var "x") Plus (Val (IntVal 1))),
         P.parse expP "[1; 2; 3]" ~?= Right (ListConst [Val (IntVal 1), Val (IntVal 2), Val (IntVal 3)]),
+        P.parse expP "[(1,1); (2,2)]" ~?= Right (ListConst [TupleConst [Val (IntVal 1), Val (IntVal 1)], TupleConst [Val (IntVal 2), Val (IntVal 2)]]),
         P.parse expP "(1, x)" ~?= Right (TupleConst [Val (IntVal 1), Var "x"]),
         P.parse expP "fun x y -> x + y"
           ~?= Right (FunctionConst "x" (FunctionConst "y" (Op2 (Var "x") Plus (Var "y")))),
@@ -64,11 +76,45 @@ test_expression =
       ]
 
 -- >>> runTestTT test_expression
+-- Counts {cases = 12, tried = 12, errors = 0, failures = 0}
+
+test_op_expression :: Test
+test_op_expression =
+  "parsing op expressions"
+    ~: TestList [
+      P.parse expP "-(-x)" ~?= Right (Op1 Neg (Op1 Neg (Var "x"))),
+      P.parse expP "-x" ~?= Right (Op1 Neg (Var "x")),
+      P.parse expP "not a"  ~?= Right (Op1 Not (Var "a")),
+      P.parse expP "-(13)" ~?= Right (Op1 Neg (Val (IntVal 13))),
+      P.parse expP "-13" ~?= Right (Val (IntVal (-13))),
+      P.parse expP "not (x || y)" ~?= Right (Op1 Not (Op2 (Var "x") Or (Var "y")))
+    ]
+
+-- >>> runTestTT test_op_expression
+-- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
+
+
+test_bop_expression :: Test
+test_bop_expression =
+  "parsing bops"
+  ~: TestList [
+    P.parse expP "1 + 2 * 3" ~?=  Right (Op2 (Val (IntVal 1)) Plus (Op2 (Val (IntVal 2)) Times (Val (IntVal 3)))),
+    P.parse expP "(1 + 2) * 3" ~?=  Right (Op2 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))) Times (Val (IntVal 3))),
+    P.parse expP "((1 + 2) * 3)" ~?=  Right (Op2 (Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))) Times (Val (IntVal 3))),
+    P.parse expP "1 * (2 + 3)" ~?= Right (Op2 (Val (IntVal 1)) Times (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3)))),
+    P.parse expP "(1 * (2 + 3))" ~?= Right (Op2 (Val (IntVal 1)) Times (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3))))
+  ]
+
+-- >>> runTestTT test_bop_expression
+-- Counts {cases = 5, tried = 5, errors = 0, failures = 2}
+
+-- >>> P.parse expP "((1 + 2) * 3)"
+-- Left "No parses"
 
 test_pattern :: Test
-test_pattern = 
+test_pattern =
   "parsing patterns"
-  ~: TestList 
+  ~: TestList
     [
       P.parse topLevelPatternP "| 1" ~?= Right (IntConstPat 1),
       P.parse topLevelPatternP "| true" ~?= Right (BoolConstPat True),
@@ -81,4 +127,8 @@ test_pattern =
     ]
 
 -- >>> runTestTT test_pattern
+-- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
+
+-- >>> P.parse expP "((6 / 3) * 2)"
+-- Left "No parses"
 

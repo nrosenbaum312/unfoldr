@@ -1,3 +1,4 @@
+module PrettyPrinterTest where
 import Test.HUnit
 import Test.QuickCheck
 import OCamlPrettyPrinter

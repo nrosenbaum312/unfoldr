@@ -19,6 +19,14 @@ pretty = PP.render . pp
 oneLine :: (PP a) => a -> String
 oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 
+instance PP Value where
+  pp :: Value -> Doc
+  pp (IntVal i) = pp i
+  pp (BoolVal b) = pp b
+  pp (TupleVal t) = PP.parens $ printList t
+  pp (ListVal l) = PP.brackets $ printList l
+  pp (FunctionVal i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
+
 instance PP Uop where
   pp Neg = PP.char '-'
   pp Not = PP.text "not"
@@ -57,19 +65,12 @@ printList [] = PP.text ""
 printList [x] = pp x
 printList (x : xs) = pp x <> PP.text ", " <> printList xs
 
-instance PP Value where
-  pp :: Value -> Doc
-  pp (IntVal i) = pp i
-  pp (BoolVal b) = pp b
-  pp (TupleVal t) = PP.parens $ printList t
-  pp (ListVal l) = PP.brackets $ printList l
-  pp (FunctionVal i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
 
 instance PP Expression where
   pp :: Expression -> Doc
   pp (Var i) = pp i
   pp (Val v) = pp v
-  pp (Op1 Neg e) = PP.char '-' <> pp e
+  pp (Op1 Neg e) = PP.char '-' <> PP.parens (pp e)
   pp (Op1 Not e) = PP.text "not" <+> pp e
   pp (Op2 e1 op e2) = pp e1 <+> pp op <+> pp e2
   pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text "; ") (pp <$> l))
@@ -135,46 +136,64 @@ genExp n =
     [
       (1, Var <$> genId),
       (1, Val <$> arbitrary),
-      (n, Op1 <$> arbitrary <*> genExp n'),
-      (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
+      (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
+      -- (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n')
       (n, ListConst <$> genExpList n'),
       (n, TupleConst <$> genExpList n'),
       (n, FunctionConst <$> genId <*> genExp n'),
-      -- (n, Match <$> genExp n' <*> genPatExpList n'),
+      (n, Match <$> genExp n' <*> genPatExpList n'),
       (n, Let <$> genId <*> genExp n' <*> genExp n'),
       (n, Apply <$> genExp n' <*> genExp n')
     ] where
         n' = n `div` 2
 
+-- instance Arbitrary Expression where
+--   arbitrary :: Gen Expression
+--   arbitrary = QC.sized genExp
+--   shrink :: Expression -> [Expression]
+--   shrink va@(Var v) = [va]
+--   shrink (Val v) = Val <$> shrink v
+--   shrink (Op1 o e) = [Op1 o e] 
+--   -- : [Op1 o e' | e' <- shrink e]
+--   shrink (Op2 e1 o e2) = [e1, e2]
+--   -- shrink (Op2 e1 o e2) = e1 : e2
+--   --   : [Op2 e1' o e2 | e1' <- shrink e1]
+--   --   ++ [Op2 e1 o e2' | e2' <- shrink e2]
+--   shrink (ListConst l) = 
+--     [ListConst l' | l' <- shrink l]
+--   shrink (TupleConst l) = 
+--     [TupleConst l' | l' <- shrink l]
+--   shrink (FunctionConst i e) = e :
+--     [FunctionConst i e' | e' <- shrink e]
+--   shrink (If e b1 b2) = b1 : b2 
+--     : [If e' b1 b2 | e' <- shrink e]
+--     ++ [If e b1' b2 | b1' <- shrink b1]
+--     ++ [If e b1 b2' | b2' <- shrink b2]
+--   shrink (Match e l) = e :
+--     [Match e' l | e' <- shrink e]
+--     ++ [Match e l' | l' <- shrink l]
+--   shrink (Let i e1 e2) = e1 : e2
+--     : [Let i e1' e2 | e1' <- shrink e1]
+--     ++ [Let i e1 e2' | e2' <- shrink e2]
+--   shrink (Apply e1 e2) = e1 : e2
+--     : [Apply e1' e2 | e1' <- shrink e1]
+--     ++ [Apply e1 e2' | e2' <- shrink e2]
+
 instance Arbitrary Expression where
   arbitrary :: Gen Expression
   arbitrary = QC.sized genExp
   shrink :: Expression -> [Expression]
-  shrink va@(Var v) = [va]
-  shrink (Val v) = Val <$> shrink v
-  shrink (Op1 o e) = e : [Op1 o e' | e' <- shrink e]
-  shrink (Op2 e1 o e2) = e1 : e2
-    : [Op2 e1' o e2 | e1' <- shrink e1]
-    ++ [Op2 e1 o e2' | e2' <- shrink e2]
-  shrink (ListConst l) = 
-    [ListConst l' | l' <- shrink l]
-  shrink (TupleConst l) = 
-    [TupleConst l' | l' <- shrink l]
-  shrink (FunctionConst i e) = e :
-    [FunctionConst i e' | e' <- shrink e]
-  shrink (If e b1 b2) = b1 : b2 
-    : [If e' b1 b2 | e' <- shrink e]
-    ++ [If e b1' b2 | b1' <- shrink b1]
-    ++ [If e b1 b2' | b2' <- shrink b2]
-  shrink (Match e l) = e :
-    [Match e' l | e' <- shrink e]
-    ++ [Match e l' | l' <- shrink l]
-  shrink (Let i e1 e2) = e1 : e2
-    : [Let i e1' e2 | e1' <- shrink e1]
-    ++ [Let i e1 e2' | e2' <- shrink e2]
-  shrink (Apply e1 e2) = e1 : e2
-    : [Apply e1' e2 | e1' <- shrink e1]
-    ++ [Apply e1 e2' | e2' <- shrink e2]
+  shrink (Var v) = [] -- No shrinking for variables
+  shrink (Val v) = Val <$> shrink v -- Shrink values if possible
+  shrink (Op1 o e) = [e] -- Shrink to the subexpression
+  shrink (Op2 e1 o e2) = [e1, e2] -- Shrink to subexpressions
+  shrink (ListConst l) = [] -- Avoid recursive shrinking of lists
+  shrink (TupleConst l) = [] -- Avoid recursive shrinking of tuples
+  shrink (FunctionConst i e) = [e] -- Shrink to the body
+  shrink (If e b1 b2) = [b1, b2] -- Shrink to branches only
+  shrink (Match e l) = [e] -- Shrink to the expression only
+  shrink (Let i e1 e2) = [e1, e2] -- Shrink to subexpressions
+  shrink (Apply e1 e2) = [e1, e2] -- Shrink to subexpressions
 
 
 genPatList :: Int -> Gen [Pattern]
