@@ -142,7 +142,7 @@ stepExp (Op1 uop exp) = stepUop uop exp
 stepExp (Op2 e1 bop e2) = stepBop e1 bop e2
 stepExp (ListConst es) = stepListConst es
 stepExp (TupleConst es) = stepListConst es
-stepExp (FunctionConst id f) = return $ Right $ Small $ FunctionConst id f
+stepExp (FunctionConst id f) = return $ Right $ Small $ Val (FunctionVal id f)
 stepExp (If g i e) = stepIf g i e
 stepExp (Match val pats) = stepMatch val pats
 stepExp (Let id val ine) = stepLet id val ine
@@ -340,6 +340,19 @@ stepMatch e arms = do
 prop_steppingDoesNotModifyValue :: Expression -> Property
 prop_steppingDoesNotModifyValue e =
   isRight (stepExpToValue e) QC.==> stepExpToValue (stepGoodExpToExp e) == stepExpToValue e
+
+test_stepExpressionToValue :: Test
+test_stepExpressionToValue =
+  "stepping expressions"
+    ~: TestList
+      [ stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) ~?= Right (IntVal 4)
+      ]
+
+-- >>> State.evalState (stepLet "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) makeScope
+-- Right (Large (Apply (Val (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 2))))) (Val (IntVal 2))))
+
+-- >>> stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2))))
+-- Right (IntVal 4)
 
 {-
 
