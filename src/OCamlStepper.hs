@@ -8,6 +8,7 @@ import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
 import OCamlParser qualified
 import OCamlSyntax
+import OCamlTypes
 import State
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC

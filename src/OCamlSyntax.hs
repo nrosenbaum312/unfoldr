@@ -31,7 +31,7 @@ data Value
   | FunctionVal Identifier Expression -- fun x -> x * 2 * y
   deriving (Eq, Show)
 
-type Scope = Map Identifier Value
+type Scope = Map Identifier Expression
 
 data Expression
   = Var Identifier -- variables, in any scope
