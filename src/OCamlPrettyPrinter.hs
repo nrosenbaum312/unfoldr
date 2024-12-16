@@ -160,6 +160,7 @@ genExp n =
       (n, ListConst <$> genExpList n'),
       (n, TupleConst <$> genExpList n'),
       (n, (Match . Var <$> genId) <*> genPatExpList n'),
+      (n, If <$> genExp n' <*> genExp n' <*> genExp n'),
       (n, Let <$> genId <*> genExp n' <*> genExp n'),
       (n, Apply <$> genExp n' <*> genExp n')
     ] where
