@@ -39,15 +39,18 @@ doStep e s i =
    in case evalState s' s of
       Left s -> putStrLn s
       Right e' -> do
-        putStr $ show i ++ ") "
+        putStr $ " " ++ show i ++ ") "
         putStrLn $ pretty e'
         printSteps e' s (i + 1)
+
+transform = "let rec transform = fun f l -> begin match l with | [] -> [] | (x::xs) -> (f x) :: transform f xs end"
+fold = "let rec fold = fun combine b l -> begin match l with | [] -> b | (x::xs) -> combine x (fold combine b xs) end"
 
 main :: IO ()
 main = do
   putStrLn "Please enter your top-level lets, followed by two newlines:"
   topLevelLets <- readUntilThreeEmptyLines
-  let parsed = parse blockP (intercalate "\n" topLevelLets)
+  let parsed = parse blockP (intercalate "\n" (transform:fold:topLevelLets))
   case parsed of
     Left s -> putStrLn s
     Right block -> do
@@ -60,6 +63,6 @@ main = do
           putStrLn ""
           putStrLn "==== Result ===="
           let (_, scope) = State.runState (stepBlock block) makeScope
-          putStr "0) "
+          putStr " 0) "
           putStrLn $ pretty exp
           printSteps exp scope 1

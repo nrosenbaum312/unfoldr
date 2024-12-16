@@ -462,4 +462,10 @@ body of the let statement.
 Step the expression to a function value; then step the arguments to values, in
 order.
 
+let rec fold = fun combine b l ->
+  begin match l with
+    | [] -> b
+    | (x::xs) -> combine x (fold combine b xs)
+  end
+
 -}
