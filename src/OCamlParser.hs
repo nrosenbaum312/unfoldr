@@ -16,7 +16,7 @@ wsP :: Parser a -> Parser a
 wsP p = p <* many P.space
 
 parens :: Parser a -> Parser a
-parens x = P.between (P.char '(') x (P.char ')')
+parens x = (P.between (P.char '(') x (P.char ')')) <|> (P.between (P.string "begin") x (P.string "end"))
 
 brackets :: Parser a -> Parser a
 brackets x = P.between (stringP "[") x (stringP "]")
@@ -86,23 +86,38 @@ varP = Var <$> idP
 valP :: Parser Expression
 valP = Val <$> (intValP <|> boolValP)
 
+-- expP :: Parser Expression
+-- expP = compP
+--   where
+--     compP = catP `P.chainl1` opAtLevel (level Gt)
+--     catP = sumP `P.chainl1` opAtLevel (level Append)
+--     sumP = prodP `P.chainl1` opAtLevel (level Plus)
+--     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
+--     uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
+--     baseP = choice [wsP (parens expP),
+--                     listConstP,
+--                     tupleConstP,
+--                     functionConstP,
+--                     ifP,
+--                     letP,
+--                     matchP,
+--                     varP,
+--                     valP]
+
 expP :: Parser Expression
-expP = compP
+expP = orP
   where
-    compP = catP `P.chainl1` opAtLevel (level Gt)
-    catP = sumP `P.chainl1` opAtLevel (level Append)
-    sumP = prodP `P.chainl1` opAtLevel (level Plus)
-    prodP = uopexpP `P.chainl1` opAtLevel (level Times)
-    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
-    baseP = choice [wsP (parens expP),
-                    listConstP,
-                    tupleConstP,
-                    functionConstP,
-                    ifP,
-                    letP,
-                    matchP,
-                    varP,
-                    valP]
+    orP = andP `P.chainl1` opAtLevel (level Or)  -- Logical OR (||)
+    andP = eqP `P.chainl1` opAtLevel (level And) -- Logical AND (&&)
+    eqP = cmpP `P.chainl1` opAtLevel (level Eq)  -- Equality and comparison (==, !=, <, >, etc.)
+    cmpP = appendP `P.chainl1` opAtLevel (level Gt)  -- Comparison operators
+    appendP = consP `P.chainl1` opAtLevel (level Append) -- Append operators (e.g., ++)
+    consP = sumP `P.chainl1` opAtLevel (level Cons) -- Cons operator (:)
+    sumP = prodP `P.chainl1` opAtLevel (level Plus) -- Addition and subtraction (+, -)
+    prodP = uopexpP `P.chainl1` opAtLevel (level Times) -- Multiplication, division, mod (*, /, %)
+    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP -- Unary operators (not, -)
+    baseP = wsP (parens expP) <|> listConstP <|> tupleConstP <|> functionConstP <|> ifP <|> letP <|> matchP <|> varP <|> valP
+
 
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
@@ -130,7 +145,7 @@ ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*>
 matchP :: Parser Expression
 matchP = Match 
     <$> (wsP (stringP "begin match") *> wsP expP <* wsP (stringP "with")) 
-    <*> many (wsP patExpP) where
+    <*> many (wsP patExpP) <* wsP (stringP "end") where
   patExpP :: Parser (Pattern, Expression)
   patExpP = wsP (liftA2 (,) (wsP topLevelPatternP) (wsP (stringP "->") *> wsP expP))
 
@@ -226,14 +241,34 @@ parseOcaml = do
 prop_roundtrip_exp :: Expression -> Bool
 prop_roundtrip_exp e = parse expP (pretty e) == Right e
 
--- >>> PP.pretty (Op1 Not (Var "x0"))
--- "not (x0)"
+prop_roundtrip_pat :: Pattern -> Bool
+prop_roundtrip_pat e = parse topLevelPatternP (pretty e) == Right e
 
--- >>> P.parse expP "not (x0)"
--- Right (Op1 Not (TupleConst [Var "x0"]))
+-- >>> PP.pretty (Op2 (Op2 (Var "X") Gt (Val (IntVal 4))) Minus (Op2 (Val (BoolVal False)) Or (Var "X")))
+-- "X > 4 - false || X"
 
--- >>> PP.pretty (Op2 (Op2 (Var "y") Ge (Var "X0")) Eq (Op2 (Var "X") Le (Val (IntVal 2))))
--- "y >= X0 = X <= 2"
+-- >>> P.parse expP "X > 4 - false || X"
+-- Right (Op2 (Op2 (Var "X") Gt (Op2 (Val (IntVal 4)) Minus (Val (BoolVal False)))) Or (Var "X"))
 
--- >>> P.parse expP "y >= X0 = X <= 2"
--- Right (Op2 (Op2 (Op2 (Var "y") Ge (Var "X0")) Eq (Var "X")) Le (Val (IntVal 2)))
+
+-- >>> pretty (Match (Var "y") [(ConsPat (BoolConstPat False) (BoolConstPat True),Match (Var "xy") [(BoolConstPat True,Val (BoolVal True))])])
+-- "begin match y with | false::true -> begin match xy with | true -> true\n                                                        end\n                   end"
+
+
+-- >>> P.parse expP "begin match y with | false::true -> begin match xy with | true -> true end end"
+-- Left "No parses"
+
+-- >>> P.parse expP "begin match x with | [] -> 1 | x::xs -> 2 end"
+-- Right (Match (Var "x") [(ListPat [],Val (IntVal 1)),(ConsPat (IdentifierPat "x") (IdentifierPat "xs"),Val (IntVal 2))])
+
+
+-- >>> pretty (Match (Var "xy") [(WildcardPat,Match (Var "y") []),(ListPat [BoolConstPat False,IdentifierPat "x0"],Match (Var "X0") [(WildcardPat,Match (Var "X") [(IntConstPat 4,Var "X"),(BoolConstPat False,Val (IntVal (-2)))]),(ConsPat (BoolConstPat False) (BoolConstPat True),Match (Var "X0") [(IntConstPat (-1),Var "X"),(BoolConstPat True,Val (IntVal 4))])]),(BoolConstPat False,Match (Var "xy") [])])
+-- "begin match xy with | _ -> begin match y with end\n                    | [false;x0] -> begin match X0 with | _ -> begin match X with | 4 -> X\n                                                                                  | false -> -2\n                                                                                  end\n                                                        | false::true -> begin match X0 with | -1 -> X\n                                                                                             | true -> 4\n                                                                                             end\n                                                        end\n                    | false -> begin match xy with end\n                    end"
+
+
+-- >>> P.parse expP "begin match x with | [] -> begin match y with | 1 -> 0 | 2 -> 1 end end"
+-- Right (Match (Var "x") [(ListPat [],Match (Var "y") [(IntConstPat 1,Val (IntVal 0)),(IntConstPat 2,Val (IntVal 1))])])
+
+-- >>> pretty (IntConstPat 0)
+-- "0"
+

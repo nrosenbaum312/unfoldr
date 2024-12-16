@@ -73,7 +73,7 @@ test_expression =
           ~?= Right (If (Val (BoolVal True)) (Val (IntVal 1)) (Val (IntVal 0))),
         P.parse expP "let x = 1 in x + 1"
           ~?= Right (Let "x" (Val (IntVal 1)) (Op2 (Var "x") Plus (Val (IntVal 1)))),
-        P.parse expP "begin match x with | [] -> 1 | x::xs -> 2"
+        P.parse expP "begin match x with | [] -> 1 | x::xs -> 2 end"
           ~?= Right
             ( Match
                 (Var "x")
@@ -100,7 +100,6 @@ test_op_expression =
 
 -- >>> runTestTT test_op_expression
 -- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
-
 
 test_bop_expression :: Test
 test_bop_expression =
@@ -133,3 +132,5 @@ test_pattern =
 
 -- >>> runTestTT test_pattern
 -- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
+
+
