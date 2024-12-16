@@ -220,23 +220,16 @@ instance Arbitrary Bop where
 
 
 genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = QC.oneof [VarDecl <$> arbitrary <*> genId <*> genExp 0, return Empty]
-genStatement n =
-  QC.frequency
-    [
-      (1, return Empty),
-      (2, VarDecl <$> arbitrary <*> genId <*> genExp n')
-    ] where
-      n' = n `div` 2
+genStatement n = VarDecl <$> arbitrary <*> genId <*> genExp n
+  where
+    n' = n `div` 2
 
 instance Arbitrary Statement where
   arbitrary :: Gen Statement
   arbitrary = QC.sized genStatement
   shrink :: Statement -> [Statement]
   shrink Empty = return Empty
-  shrink (VarDecl b i e) =
-    [VarDecl b' i e | b' <- shrink b]
-    ++ [VarDecl b i e' | e' <- shrink e]
+  shrink s = [s]
 
 
 genBlock :: Int -> Gen Block
