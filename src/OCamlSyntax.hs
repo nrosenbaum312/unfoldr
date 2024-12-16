@@ -93,10 +93,17 @@ level :: Bop -> Int
 level Times = 7
 level Divide = 7
 level Mod = 7
-level Plus = 5
-level Minus = 5
-level Append = 4
-level _ = 3 -- comparison operators
+level Plus = 6
+level Minus = 6
+level Cons =  5
+level Append = 5
+level Eq = 4
+level Gt = 4
+level Ge = 4
+level Lt = 4
+level Le = 4
+level Or = 3
+level And = 3
 
 -- isBase :: Expression -> Bool
 -- isBase TableConst {} = True

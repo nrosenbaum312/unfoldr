@@ -1,11 +1,11 @@
 module OCamlPrettyPrinter where
 
 import Data.List
-import OCamlSyntax
 import Test.QuickCheck as QC
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
+import OCamlSyntax
 
 class PP a where
   pp :: a -> Doc
@@ -72,7 +72,7 @@ instance PP Expression where
   pp (Val v) = pp v
   pp (Op1 Neg e) = PP.char '-' <> PP.parens (pp e)
   pp (Op1 Not e) = PP.text "not" <+> PP.parens (pp e)
-  pp (Op2 e1 op e2) = pp e1 <+> pp op <+> pp e2
+  pp (Op2 e1 op e2) = PP.parens (pp e1) <+> pp op <+> PP.parens (pp e2)
   pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text "; ") (pp <$> l))
   pp (TupleConst l) = PP.parens $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
   pp (FunctionConst i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
@@ -131,19 +131,19 @@ genPatExpList n = do
 
 genExp :: Int -> Gen Expression
 genExp 0 = QC.oneof [Var <$> genId, Val <$> arbitrary]
-genExp n = 
+genExp n =
   QC.frequency
     [
-      (1, Var <$> genId),
-      (1, Val <$> arbitrary),
-      (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
-      (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
-      (n, ListConst <$> genExpList n'),
-      (n, TupleConst <$> genExpList n'),
-      (n, FunctionConst <$> genId <*> genExp n'),
-      (n, Match <$> genExp n' <*> genPatExpList n'),
-      (n, Let <$> genId <*> genExp n' <*> genExp n'),
-      (n, Apply <$> genExp n' <*> genExp n')
+      -- (1, Var <$> genId),
+      -- (1, Val <$> arbitrary),
+      -- (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
+      -- (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
+      -- (n, ListConst <$> genExpList n'),
+      -- (n, TupleConst <$> genExpList n'),
+      --(n, FunctionConst <$> genId <*> genExp n'),
+      (n, (Match . Var <$> genId) <*> genPatExpList n')
+      -- (n, Let <$> genId <*> genExp n' <*> genExp n'),
+      -- (n, Apply <$> genExp n' <*> genExp n')
     ] where
         n' = n `div` 2
 
@@ -171,7 +171,7 @@ genPatList n = do
 
 genPat :: Int -> Gen Pattern
 genPat 0 = QC.oneof [IntConstPat <$> arbitrary, BoolConstPat <$> arbitrary]
-genPat n = 
+genPat n =
   QC.frequency
     [
       (1, IntConstPat <$> arbitrary),
@@ -192,7 +192,7 @@ instance Arbitrary Pattern where
   shrink (BoolConstPat b) = BoolConstPat <$> shrink b
   shrink id@(IdentifierPat i) = [id]
   shrink (ListPat l) = [ListPat l' | l' <- shrink l]
-  shrink (ConsPat p1 p2) = p1 : p2 
+  shrink (ConsPat p1 p2) = p1 : p2
     : [ConsPat p1' p2 | p1' <- shrink p1]
     ++ [ConsPat p1 p2' | p2' <- shrink p2]
   shrink (TuplePat l) = [TuplePat l' | l' <- shrink l]
@@ -211,8 +211,8 @@ instance Arbitrary Bop where
 
 genStatement :: Int -> Gen Statement
 genStatement n | n <= 1 = QC.oneof [VarDecl <$> arbitrary <*> arbitrary <*> genExp 0, return Empty]
-genStatement n = 
-  QC.frequency 
+genStatement n =
+  QC.frequency
     [
       (1, return Empty),
       (2, VarDecl <$> arbitrary <*> arbitrary <*> genExp n')
@@ -224,7 +224,7 @@ instance Arbitrary Statement where
   arbitrary = QC.sized genStatement
   shrink :: Statement -> [Statement]
   shrink Empty = return Empty
-  shrink (VarDecl b i e) = 
+  shrink (VarDecl b i e) =
     [VarDecl b' i e | b' <- shrink b]
     ++ [VarDecl b i e' | e' <- shrink e]
 
@@ -232,7 +232,7 @@ instance Arbitrary Statement where
 genBlock :: Int -> Gen Block
 genBlock n = Block <$> genStmts n where
   genStmts 0 = pure []
-  genStmts n = 
+  genStmts n =
     QC.frequency
       [
         (1, pure []),
