@@ -43,6 +43,12 @@ stepStatement (VarDecl r id exp) = do
   return ()
 stepStatement Empty = return ()
 
+stepBlock :: Block -> State Scope ()
+stepBlock (Block []) = return ()
+stepBlock (Block (s:ss)) = do
+  stepStatement s
+  stepBlock (Block ss)
+
 -- Substitutes an id for its bound expression in the sub-expression
 substitute :: Identifier -> Expression -> Expression -> Expression
 substitute id valExpression (Var vid) = if vid == id then valExpression else Var vid
@@ -109,6 +115,19 @@ data Step e v
 
 type ExpressionStep = Step Expression Value
 
+stepExpToValueWithScope :: Expression -> Scope -> Either String Value
+stepExpToValueWithScope e@(Val (FunctionVal id body)) s =
+  let s' = largeStepExp e
+   in case evalState s' s of
+        Left s -> Left s
+        Right e' -> stepExpToValueWithScope e' s
+stepExpToValueWithScope (Val v) s = Right v
+stepExpToValueWithScope e s =
+  let s' = largeStepExp e
+   in case evalState s' s of
+        Left s -> Left s
+        Right e' -> stepExpToValueWithScope e' s
+
 -- Steps an expression to a value, or a string if there's an error.
 stepExpToValue :: Expression -> Either String Value
 stepExpToValue (Val v) = Right v
@@ -171,6 +190,9 @@ stepExp (If g i e) = stepIf g i e
 stepExp (Match val pats) = stepMatch val pats
 stepExp (Let id val ine) = stepLet id val ine
 stepExp (Apply fn arg) = stepApply fn arg
+
+-- >>> State.runState (stepExpN 3 (Op2 (Var "x") Plus (Var "y"))) (Map.fromList [("x",Val (IntVal 3)),("y",Val (IntVal 5))])
+-- (Right (Val (IntVal 8)),fromList [("x",Val (IntVal 3)),("y",Val (IntVal 5))])
 
 -- >>> State.runState (stepExpN 1 (If (Op2 (Op1 Neg (Val (IntVal 1))) Eq (Val (IntVal (-1)))) (Val (IntVal 10)) (Val (IntVal 20)))) makeScope
 -- (Right (If (Op2 (Val (IntVal (-1))) Eq (Val (IntVal (-1)))) (Val (IntVal 10)) (Val (IntVal 20))),fromList [])
@@ -397,6 +419,9 @@ transform = parse expP "fun f -> fun l -> \
   \end"
 
 -- >>> transform
+
+-- >>> parse expP "fun x -> if x mod 2 = 0 then true else false"
+-- Right (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Val (BoolVal True)) (Val (BoolVal False)))))
 
 -- >>> pretty $ stepExpNToExp 0 s
 -- >>> pretty $ stepExpNToExp 1 s

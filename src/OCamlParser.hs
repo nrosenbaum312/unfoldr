@@ -45,7 +45,8 @@ reserved =
     "begin",
     "match",
     "let",
-    "mod"
+    "mod",
+    "with"
   ]
 
 --- Values
@@ -107,9 +108,6 @@ expP = boolP
                     matchP,
                     varP,
                     valP]
-
--- >>> parse expP "begin match 2 with 2 -> 2 end"
--- Left "No parses"
 
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP

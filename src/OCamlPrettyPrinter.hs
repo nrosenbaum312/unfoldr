@@ -89,7 +89,7 @@ instance PP Expression where
     printList [] = PP.text "end"
     printList ((p, e) : xs) = PP.char '|' <+> pp p <+> PP.text "->" <+> pp e PP.$+$ printList xs
   pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$+$ pp e2
-  pp (Apply f a) = PP.parens (pp f <+> pp a)
+  pp (Apply f a) = PP.parens (PP.parens (pp f) <+> PP.parens (pp a))
 
 instance PP Pattern where
   pp :: Pattern -> Doc
@@ -153,8 +153,8 @@ genExp n =
       (n, ListConst <$> genExpList n'),
       (n, TupleConst <$> genExpList n'),
       (n, (Match . Var <$> genId) <*> genPatExpList n'),
-      (n, Let <$> genId <*> genExp n' <*> genExp n')
-      -- (n, Apply <$> genExp n' <*> genExp n')
+      (n, Let <$> genId <*> genExp n' <*> genExp n'),
+      (n, Apply <$> genExp n' <*> genExp n')
     ] where
         n' = n `div` 2
 
