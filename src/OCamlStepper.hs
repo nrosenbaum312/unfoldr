@@ -184,7 +184,7 @@ stepExp (Val val) = return $ Right $ Final val
 stepExp (Op1 uop exp) = stepUop uop exp
 stepExp (Op2 e1 bop e2) = stepBop e1 bop e2
 stepExp (ListConst es) = stepListConst es
-stepExp (TupleConst es) = stepListConst es
+stepExp (TupleConst es) = stepTupleConst es
 stepExp (FunctionConst id f) = return $ Right $ Final (FunctionVal id f)
 stepExp (If g i e) = stepIf g i e
 stepExp (Match val pats) = stepMatch val pats
@@ -279,7 +279,7 @@ evalBop v Cons (ListVal l) =
         then
           Right (ListVal (v : l))
         else
-          Left $ "Type error: can't cons an element of type " ++ show (typeof v) ++ " into a list of type " ++ show l
+          Left $ "Type error: can't cons an element of type " ++ show (typeof v) ++ " into a list of type " ++ show ltype
 evalBop l b r = Left $ "Type error: can't perform operation " ++ show b ++ " on values of type " ++ show (typeof l) ++ " and " ++ show (typeof r)
 
 -- Steps a list const.
@@ -291,6 +291,17 @@ stepListConst l = do
     Right (Small r') -> return $ Right $ Small $ ListConst r'
     Right (Large r') -> return $ Right $ Large $ ListConst r'
     Right (Final vs) -> return $ Right $ Final $ ListVal vs
+    Left s -> return $ Left s
+
+-- Steps a tuple const.
+stepTupleConst :: [Expression] -> State Scope (Either String ExpressionStep)
+stepTupleConst [] = return $ Right $ Small $ Val $ TupleVal []
+stepTupleConst l = do
+  es <- valueify l
+  case es of
+    Right (Small r') -> return $ Right $ Small $ TupleConst r'
+    Right (Large r') -> return $ Right $ Large $ TupleConst r'
+    Right (Final vs) -> return $ Right $ Final $ TupleVal vs
     Left s -> return $ Left s
 
 -- Steps a list of expression one step closer to a list of values.
