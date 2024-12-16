@@ -19,7 +19,7 @@ wsP :: Parser a -> Parser a
 wsP p = p <* many P.space
 
 parens :: Parser a -> Parser a
-parens x = P.between (P.char '(') x (P.char ')') <|> P.between (P.string "begin") x (P.string "end")
+parens x = P.between (P.char '(') x (P.char ')') <|> P.between (wsP (P.string "begin")) x (wsP (P.string "end"))
 
 brackets :: Parser a -> Parser a
 brackets x = P.between (stringP "[") x (stringP "]")
@@ -137,9 +137,8 @@ ifP :: Parser Expression
 ifP = If <$> (wsP (stringP "if") *> wsP expP <* wsP (stringP "then")) <*> wsP expP <*> (wsP (stringP "else") *> expP)
 
 matchP :: Parser Expression
-matchP = Match 
-    <$> (wsP (stringP "begin match") *> wsP expP <* wsP (stringP "with")) 
-    <*> many (wsP patExpP) <* wsP (stringP "end") where
+matchP = 
+  parens (Match <$> (wsP (stringP "match") *> wsP expP) <* wsP (stringP "with") <*> many (wsP patExpP)) where
   patExpP :: Parser (Pattern, Expression)
   patExpP = wsP (liftA2 (,) (wsP (P.char '|') *> wsP topLevelPatternP) (wsP (stringP "->") *> wsP expP))
 
