@@ -134,7 +134,10 @@ functionConstP =
     foldParams (x : xs) ex = Val (FunctionVal x (foldr (\x acc -> Val (FunctionVal x acc)) ex xs))
 
 ifP :: Parser Expression
-ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*> (wsP (stringP "else") *> expP)
+ifP = If <$> (wsP (stringP "if") *> wsP expP <* wsP (stringP "then")) <*> wsP expP <*> (wsP (stringP "else") *> expP)
+
+-- >>> P.parse expP "if (1, 2) then (1, 2) else (1, 2)"
+-- Right (If (TupleConst [Val (IntVal 1),Val (IntVal 2)]) (TupleConst [Val (IntVal 1),Val (IntVal 2)]) (TupleConst [Val (IntVal 1),Val (IntVal 2)]))
 
 matchP :: Parser Expression
 matchP = Match 
@@ -240,3 +243,11 @@ parseOcaml = do
   input <- getContents
   let result = P.parse (const <$> blockP <*> P.eof) input
   return result
+
+-- >>> PP.pretty (If (Var "XY") (TupleConst [Op1 Neg (Var "x"),ListConst [Val (BoolVal True),Val (BoolVal True)]]) (Op2 (Var "X0") Cons (Match (Var "X0") [(BoolConstPat False,Val (IntVal (-3))),(BoolConstPat False,Val (BoolVal True)),(BoolConstPat True,Var "XY")])))
+-- "if XY\n then 8 \n else (X0) :: (begin match X0 with\n | false -> -3\n | true -> XY\n end)"
+
+-- (-(x), [true; true])
+
+-- >>> P.parse expP "if (1, 2) \n then x \n else (X0) :: (begin match X0 with\n | false -> -3\n | true -> XY\n end)"
+-- Left "No parses"
