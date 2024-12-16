@@ -8,7 +8,7 @@ import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
 import OCamlSyntax
-import OCamlTypes 
+import OCamlTypes
 import State
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck (Property)
@@ -52,7 +52,7 @@ stepBlock (Block (s:ss)) = do
 -- Substitutes an id for its bound expression in the sub-expression
 substitute :: Identifier -> Expression -> Expression -> Expression
 substitute id valExpression (Var vid) = if vid == id then valExpression else Var vid
-substitute id valExpression ex@(Val (FunctionVal aid body)) = 
+substitute id valExpression ex@(Val (FunctionVal aid body)) =
   if aid == id then ex else Val (FunctionVal aid (substitute id valExpression body))
 substitute id valExpression (Val value) = Val value
 substitute id valExpression (Op1 uop e) = Op1 uop (substitute id valExpression e)
@@ -275,7 +275,7 @@ evalBop (ListVal l1) Append (ListVal l2) =
         else Left $ "Type error: can't append a list of type " ++ show l1Type ++ "to a list of type " ++ show l2Type
 evalBop v Cons (ListVal l) =
   let ltype = typeofl l
-   in if typeof v == ltype
+   in if typeof v == ltype || ltype == TUnknown
         then
           Right (ListVal (v : l))
         else
@@ -301,7 +301,7 @@ stepListConst l = do
 
 -- Steps a list of expression one step closer to a list of values.
 valueify :: [Expression] -> State Scope (Either String (Step [Expression] [Value]))
-valueify [] = return $ Right $ Small []
+valueify [] = return $ Right $ Final []
 valueify (Val v : xs) = do
   rest <- valueify xs
   case rest of
@@ -372,9 +372,12 @@ match (BoolVal b) (BoolConstPat bi) = if b == bi then Just [] else Nothing
 match (TupleVal t) (TuplePat pats) = do
   bindings <- zipWithM match t pats
   return (concat bindings)
-match (ListVal l) (ListPat pats) = do
-  bindings <- zipWithM match l pats
-  return (concat bindings)
+match (ListVal l) (ListPat pats) =
+  if length l == length pats 
+    then do
+      bindings <- zipWithM match l pats
+      return (concat bindings)
+    else Nothing
 match (ListVal (p : ps)) (ConsPat elp lp) = do
   elBindings <- match p elp
   lBindings <- match (ListVal ps) lp
@@ -383,9 +386,10 @@ match _ _ = Nothing
 
 -- Steps a match expression.
 stepMatch :: Expression -> [(Pattern, Expression)] -> State Scope (Either String ExpressionStep)
+stepMatch e@(Val v) [] = return $ Left "Failed to find a matching pattern!"
 stepMatch e@(Val v) ((p, arm) : ps) =
   case match v p of
-    Nothing -> return $ Left "Failed to find a matching pattern!"
+    Nothing -> stepMatch e ps
     Just bindings -> return $ Right $ Large $ foldl (\ine (id, e) -> substitute id e ine) arm bindings
 stepMatch e arms = do
   e' <- stepExp e
@@ -408,10 +412,6 @@ test_stepExpressionToValue =
 
 -- >>> State.evalState (stepLet "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) makeScope
 -- Right (Large (Apply (Val (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 2))))) (Val (IntVal 2))))
-
-s = Let "f" (Val $ FunctionVal "x" (Val $ FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))) (Apply (Apply (Var "f") (Val (IntVal 2))) (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3))))
-s' = Apply (Apply (Val (FunctionVal "x" (Val (FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))))) (Val (IntVal 2))) (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3)))
-s'' = Apply (Val (FunctionVal "x" (Val (FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))))) (Val (IntVal 2))
 transform = parse expP "fun f -> fun l -> \
   \begin match l with \
   \| [] -> [] \
