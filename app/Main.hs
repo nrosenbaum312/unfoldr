@@ -30,7 +30,6 @@ whileM action = do
   when c $ whileM action
 
 printSteps :: Expression -> Scope -> Int -> IO ()
-printSteps e@(Val (FunctionVal id body)) s i = doStep e s i
 printSteps (Val v) s i = do
   putStr "==> "
   putStrLn $ pretty v

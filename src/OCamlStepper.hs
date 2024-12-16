@@ -116,11 +116,6 @@ data Step e v
 type ExpressionStep = Step Expression Value
 
 stepExpToValueWithScope :: Expression -> Scope -> Either String Value
-stepExpToValueWithScope e@(Val (FunctionVal id body)) s =
-  let s' = largeStepExp e
-   in case evalState s' s of
-        Left s -> Left s
-        Right e' -> stepExpToValueWithScope e' s
 stepExpToValueWithScope (Val v) s = Right v
 stepExpToValueWithScope e s =
   let s' = largeStepExp e
@@ -239,6 +234,10 @@ stepBop :: Expression -> Bop -> Expression -> State Scope (Either String Express
 stepBop (Val v1) bop (Val v2) = return $ do
   res <- evalBop v1 bop v2
   return $ Final res
+stepBop (Val (BoolVal False)) And r =
+  return $ Right $ Final (BoolVal False)
+stepBop (Val (BoolVal True)) Or r =
+  return $ Right $ Final (BoolVal True)
 stepBop (Val v1) bop r = do
   r' <- stepExp r
   case r' of
@@ -270,7 +269,7 @@ evalBop (BoolVal b1) Or (BoolVal b2) = Right $ BoolVal (b1 || b2)
 evalBop (BoolVal b1) And (BoolVal b2) = Right $ BoolVal (b1 && b2)
 evalBop (ListVal l1) Append (ListVal l2) =
   let (l1Type, l2Type) = (typeofl l1, typeofl l2)
-   in if l1Type == l2Type
+   in if l1Type == l2Type || l1Type == TUnknown || l2Type == TUnknown
         then Right $ ListVal (l1 ++ l2)
         else Left $ "Type error: can't append a list of type " ++ show l1Type ++ "to a list of type " ++ show l2Type
 evalBop v Cons (ListVal l) =

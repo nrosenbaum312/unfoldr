@@ -24,8 +24,8 @@ instance PP Value where
   pp :: Value -> Doc
   pp (IntVal i) = pp i
   pp (BoolVal b) = pp b
-  pp (TupleVal t) = PP.parens $ printList t
-  pp (ListVal l) = PP.brackets $ printList l
+  pp (TupleVal t) = PP.parens $ printList t ", "
+  pp (ListVal l) = PP.brackets $ printList l "; "
   pp (FunctionVal i e) = PP.parens $ PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
 
 instance PP (Either String Expression) where
@@ -66,11 +66,10 @@ instance PP String where
   pp :: String -> Doc
   pp = PP.text
 
-printList :: [Value] -> Doc
-printList [] = PP.text ""
-printList [x] = pp x
-printList (x : xs) = pp x <> PP.text ", " <> printList xs
-
+printList :: [Value] -> String -> Doc
+printList [] delim = PP.text ""
+printList [x] delim = pp x
+printList (x : xs) delim = pp x <> PP.text delim <> printList xs delim
 
 instance PP Expression where
   pp :: Expression -> Doc
