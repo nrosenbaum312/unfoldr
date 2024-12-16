@@ -83,12 +83,19 @@ instance PP Expression where
   pp (TupleConst [e]) = pp e
   pp (TupleConst l) = PP.parens $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
   pp (FunctionConst i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
-  pp (If e1 e2 e3) = PP.text "if" <+> pp e1 <+> PP.text "then" <+> pp e2 <+> PP.text "else" <+> pp e3
-  pp (Match e l) = PP.text "begin match" <+> pp e <+> PP.text "with" <+> printList l  where
-    printList :: [(Pattern, Expression)] -> Doc
-    printList [] = PP.text "end"
-    printList ((p, e) : xs) = PP.char '|' <+> pp p <+> PP.text "->" <+> pp e PP.$+$ printList xs
-  pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$+$ pp e2
+  pp (If e1 e2 e3) = 
+    PP.text "if" <+> pp e1 PP.$$
+    PP.nest 4 (PP.text "then" <+> pp e2 PP.$$ PP.text "else" <+> pp e3)
+  pp (Match e l) =
+    PP.text "begin match" <+> pp e <+> PP.text "with" PP.$$
+    PP.nest 4 (printList l)
+    where
+      printList :: [(Pattern, Expression)] -> Doc
+      printList [] = PP.text "end"
+      printList ((p, e) : xs) =
+        PP.vcat $
+          (PP.char '|' <+> pp p <+> PP.text "->" <+> pp e) : [printList xs]
+  pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$$ pp e2
   pp (Apply f a) = PP.parens (PP.parens (pp f) <+> PP.parens (pp a))
 
 instance PP Pattern where
@@ -153,6 +160,7 @@ genExp n =
       (n, ListConst <$> genExpList n'),
       (n, TupleConst <$> genExpList n'),
       (n, (Match . Var <$> genId) <*> genPatExpList n'),
+      (n, If <$> genExp n' <*> genExp n' <*> genExp n'),
       (n, Let <$> genId <*> genExp n' <*> genExp n'),
       (n, Apply <$> genExp n' <*> genExp n')
     ] where

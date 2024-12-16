@@ -127,15 +127,9 @@ test_pattern =
       P.parse topLevelPatternP "(x, 1)" ~?= Right (TuplePat [IdentifierPat "x", IntConstPat 1]),
       P.parse topLevelPatternP "x" ~?= Right (IdentifierPat "x"),
       P.parse topLevelPatternP "x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
-<<<<<<< Updated upstream
       P.parse topLevelPatternP "x::xs::xss" ~?= Right (ConsPat (ConsPat (IdentifierPat "x") (IdentifierPat "xs")) (IdentifierPat "xss")),
       P.parse topLevelPatternP "1 :: []" ~?= Right (ConsPat (IntConstPat 1) (ListPat [])),
       P.parse topLevelPatternP "(x::xs)" ~?= Right  (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))
-=======
-      P.parse topLevelPatternP "x::xs::xss" ~?= Right (ConsPat (IdentifierPat "x") (ConsPat (IdentifierPat "xs") (IdentifierPat "xss"))),
-      P.parse topLevelPatternP "1 :: []" ~?= Right (ConsPat (IntConstPat 1) (ListPat [])),
-      P.parse topLevelPatternP "(x::xs)" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))
->>>>>>> Stashed changes
     ]
 
 -- >>> runTestTT test_pattern
