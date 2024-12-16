@@ -42,11 +42,10 @@ reserved =
     "then",
     "true",
     "fun",
-    "fold",
-    "transform",
     "begin",
     "match",
-    "let"
+    "let",
+    "mod"
   ]
 
 --- Values
@@ -97,7 +96,8 @@ expP = boolP
     catP = sumP `P.chainl1` opAtLevel (level Append)
     sumP = prodP `P.chainl1` opAtLevel (level Plus)
     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
-    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
+    uopexpP = applyP <|> Op1 <$> uopP <*> uopexpP
+    applyP = foldl1 Apply <$> some baseP
     baseP = choice [wsP (parens expP),
                     tupleConstP, 
                     listConstP,
@@ -107,6 +107,9 @@ expP = boolP
                     matchP,
                     varP,
                     valP]
+
+-- >>> parse expP "begin match 2 with 2 -> 2 end"
+-- Left "No parses"
 
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
@@ -144,9 +147,6 @@ matchP = Match
 
 letP :: Parser Expression
 letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> wsP expP <*> (wsP (stringP "in") *> expP)
-
-applyP :: Parser Expression
-applyP = Apply <$> wsP expP <*> wsP expP
 
 --- Patterns
 topLevelPatternP :: Parser Pattern
