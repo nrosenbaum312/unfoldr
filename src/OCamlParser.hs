@@ -143,17 +143,17 @@ matchP = Match
     <$> (wsP (stringP "begin match") *> wsP expP <* wsP (stringP "with")) 
     <*> many (wsP patExpP) <* wsP (stringP "end") where
   patExpP :: Parser (Pattern, Expression)
-  patExpP = wsP (liftA2 (,) (wsP topLevelPatternP) (wsP (stringP "->") *> wsP expP))
+  patExpP = wsP (liftA2 (,) (wsP (P.char '|') *> wsP topLevelPatternP) (wsP (stringP "->") *> wsP expP))
 
 letP :: Parser Expression
 letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> wsP expP <*> (wsP (stringP "in") *> expP)
 
 --- Patterns
 topLevelPatternP :: Parser Pattern
-topLevelPatternP = wsP (P.char '|') *> wsP
+topLevelPatternP = wsP
   (choice [
+    consPatNormalP,
     tuplePatP,
-    consPatP,
     listPatP,
     wildcardPatP,
     boolConstPatP,
@@ -162,14 +162,14 @@ topLevelPatternP = wsP (P.char '|') *> wsP
   ])
 
 otherPatternP :: Parser Pattern
-otherPatternP = choice [
-  listPatP,
-  tuplePatP,
-  wildcardPatP,
-  intConstPatP,
-  boolConstPatP,
-  identifierPatP
-  ]
+otherPatternP = wsP (choice [
+    tuplePatP,
+    listPatP,
+    wildcardPatP,
+    boolConstPatP,
+    intConstPatP,
+    identifierPatP
+  ])
 
 intConstPatP :: Parser Pattern
 intConstPatP = IntConstPat <$> wsP P.int
@@ -183,15 +183,33 @@ identifierPatP :: Parser Pattern
 identifierPatP = IdentifierPat <$> idP
 
 listPatP :: Parser Pattern
-listPatP = ListPat <$> brackets (wsP otherPatternP `P.sepBy` wsP (P.char ';'))
+listPatP = ListPat <$> brackets (wsP topLevelPatternP `P.sepBy` wsP (P.char ';'))
 
 consPatP :: Parser Pattern
-consPatP = consPatPnormal <|> parens consPatPnormal
+consPatP = consPatNormalP
 
-consPatPnormal :: Parser Pattern
-consPatPnormal = otherPatternP `P.chainl1` consOp
+-- >>> PP.pretty (Match (Var "XY") [(WildcardPat,ListConst [ListConst [Var "X",Var "xy"],Op1 Neg (Var "y"),Match (Var "xy") [(IntConstPat (-8),Val (BoolVal True)),(BoolConstPat False,Val (IntVal 7))]]),(ConsPat (ConsPat (BoolConstPat False) (IntConstPat 9)) (IdentifierPat "X0"),Let "xy" (Let "x" (Val (BoolVal False)) (Val (IntVal 5))) (TupleConst [Var "X0",Val (IntVal (-3)),Var "X0"]))])
+-- "begin match XY with | _ -> [[X; xy]; -(y); begin match xy with | -8 -> true\n | false -> 7\n end]\n | false::9::X0 -> let xy = let x = false in\n 5 in\n (X0, -3, X0)\n end"
+
+-- >>> P.parse expP "begin match XY with | _ -> [[X; xy]; -(y); begin match xy with | -8 -> true\n | false -> 7\n end]\n | false::9::X0 -> let xy = let x = false in\n 5 in\n (X0, -3, X0)\n end"
+-- Right (Match (Var "XY") [(WildcardPat,ListConst [ListConst [Var "X",Var "xy"],Op1 Neg (Var "y"),Match (Var "xy") [(IntConstPat (-8),Val (BoolVal True)),(BoolConstPat False,Val (IntVal 7))]]),(ConsPat (BoolConstPat False) (ConsPat (IntConstPat 9) (IdentifierPat "X0")),Let "xy" (Let "x" (Val (BoolVal False)) (Val (IntVal 5))) (TupleConst [Var "X0",Val (IntVal (-3)),Var "X0"]))])
+
+
+-- >>> P.parse expP "begin match x with | (3,true)::false -> x0\n | true::-2::[true;true] -> X0\n end"
+-- Right (Match (Var "x") [(ConsPat (TuplePat [IntConstPat 3,BoolConstPat True]) (BoolConstPat False),Var "x0"),(ConsPat (BoolConstPat True) (ConsPat (IntConstPat (-2)) (ListPat [BoolConstPat True,BoolConstPat True])),Var "X0")])
+
+
+-- >>> PP.pretty (Match (Var "y") [(ConsPat (ConsPat (IntConstPat 5) (BoolConstPat True)) (ConsPat (IntConstPat 3) (IntConstPat 1)),Var "X0")])
+-- "begin match y with | 5::true::3::1 -> X0\n end"
+
+-- >>> P.parse expP "begin match y with | 5::true::3::1 -> X0\n end"
+-- Right (Match (Var "y") [(ConsPat (IntConstPat 5) (ConsPat (BoolConstPat True) (ConsPat (IntConstPat 3) (IntConstPat 1))),Var "X0")])
+
+consPatNormalP :: Parser Pattern
+consPatNormalP = makeCons <$> otherPatternP <*> many (wsP (stringP "::") *> otherPatternP)
   where
-    consOp = ConsPat <$ wsP (stringP "::")
+    makeCons p [] = p
+    makeCons p (x:xs) = ConsPat p (makeCons x xs)
 
 tuplePatP :: Parser Pattern
 tuplePatP = 
@@ -200,7 +218,7 @@ tuplePatP =
       [x] -> x
       l -> TuplePat elts
   )
-    <$> parens (wsP (otherPatternP `P.sepBy` wsP (P.char ',')))
+    <$> parens (wsP (topLevelPatternP `P.sepBy` wsP (P.char ',')))
 
 wildcardPatP :: Parser Pattern
 wildcardPatP = WildcardPat <$ wsP (P.char '_')
@@ -253,3 +271,15 @@ prop_roundtrip_stat s = parse statementP (pretty s) == Right s
 
 prop_roundtrip_pat :: Pattern -> Bool
 prop_roundtrip_pat e = parse topLevelPatternP (pretty e) == Right e
+
+-- >>> PP.pretty (Match (Var "xy") [(TuplePat [ListPat [BoolConstPat False,IntConstPat (-3)],ListPat [IntConstPat 1,BoolConstPat True,BoolConstPat False]],Var "x0"),(ListPat [IdentifierPat "x",ConsPat (IntConstPat (-3)) (IntConstPat 1)],Var "x")])
+-- "begin match xy with | ([false;-3],[1;true;false]) -> x0\n | [x;-3::1] -> x\n  end"
+
+-- >>> P.parse expP "begin match xy with | [x;x] -> x\n | ([false;-3],[1;true;false]) -> x0\n end"
+-- Right (Match (Var "xy") [(ListPat [IdentifierPat "x",IdentifierPat "x"],Var "x"),(TuplePat [ListPat [BoolConstPat False,IntConstPat (-3)],ListPat [IntConstPat 1,BoolConstPat True,BoolConstPat False]],Var "x0")])
+
+-- >>> P.parse consPatP "x::xs"
+-- Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))
+
+-- >>> P.parse consPatP "x::xsx::xss"
+-- Right (ConsPat (ConsPat (IdentifierPat "x") (IdentifierPat "xsx")) (IdentifierPat "xss"))

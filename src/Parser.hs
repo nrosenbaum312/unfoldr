@@ -9,7 +9,7 @@ module Parser(Parser, doParse, get, eof, filter,
                           satisfy, alpha, digit, upper, lower, space,
                           char, string, int,
                           chainl1, chainl, choice,
-                          between, sepBy1, sepBy) where
+                          between, sepBy1, sepBy, chainr1 ) where
 
 import Prelude hiding (filter)
 
@@ -142,6 +142,11 @@ int = f <$> ((++) <$> string "-" <*> some digit <|> some digit) where
 chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
 p `chainl1` pop = foldl comb <$> p <*> rest where
    comb x (op,y) = x `op` y
+   rest = many ((,) <$> pop <*> p)
+
+chainr1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+p `chainr1` pop = foldr comb <$> p <*> rest where
+   comb (op,y) x = y `op` x
    rest = many ((,) <$> pop <*> p)
 
 -- | @chainl p pop x@ parses zero or more occurrences of @p@, separated by @pop@.
