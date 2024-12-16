@@ -5,9 +5,9 @@ import GHC.Base (many, undefined, (<|>))
 import GHC.Generics (Par1)
 import OCamlPrettyPrinter as PP
 import OCamlSyntax
-    ( Bop(Plus, Or, Times),
+    ( Bop(Plus, Or, Times, Cons),
       Expression(Val, ListConst, TupleConst, FunctionConst, If, Let,
-                 Match, Op1, Var, Op2),
+                 Match, Op1, Var, Op2, Apply),
       Pattern(IdentifierPat, BoolConstPat, WildcardPat, ListPat,
               TuplePat, IntConstPat, ConsPat),
       Statement,
@@ -80,7 +80,8 @@ test_expression =
                 [ (ListPat [], Val (IntVal 1)),
                   (ConsPat (IdentifierPat "x") (IdentifierPat "xs"), Val (IntVal 2))
                 ]
-            )
+            ),
+        P.parse expP "(f x :: (transform f xs))" ~?= Right (Op2 (Apply (Var "f") (Var "x")) Cons (Apply (Apply (Var "transform") (Var "f")) (Var "xs")))
       ]
 
 -- >>> runTestTT test_expression
@@ -127,10 +128,14 @@ test_pattern =
       P.parse topLevelPatternP "| (x, 1)" ~?= Right (TuplePat [IdentifierPat "x", IntConstPat 1]),
       P.parse topLevelPatternP "| x" ~?= Right (IdentifierPat "x"),
       P.parse topLevelPatternP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
-      P.parse topLevelPatternP "| x::xs::xss" ~?= Right (ConsPat (ConsPat (IdentifierPat "x") (IdentifierPat "xs")) (IdentifierPat "xss"))
+      P.parse topLevelPatternP "| x::xs::xss" ~?= Right (ConsPat (ConsPat (IdentifierPat "x") (IdentifierPat "xs")) (IdentifierPat "xss")),
+      P.parse topLevelPatternP "| 1 :: []" ~?= Right (ConsPat (IntConstPat 1) (ListPat [])),
+      P.parse topLevelPatternP "|(x::xs)" ~?= Right  (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))
     ]
 
 -- >>> runTestTT test_pattern
--- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
+-- Counts {cases = 10, tried = 10, errors = 0, failures = 0}
 
 
+-- >>>  P.parse topLevelPatternP "| (x::xs)"
+-- Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))

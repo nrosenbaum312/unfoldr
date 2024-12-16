@@ -105,7 +105,7 @@ valP = Val <$> (intValP <|> boolValP)
 --                     valP]
 
 expP :: Parser Expression
-expP = orP
+expP = applyP <|> orP
   where
     orP = andP `P.chainl1` opAtLevel (level Or)  -- Logical OR (||)
     andP = eqP `P.chainl1` opAtLevel (level And) -- Logical AND (&&)
@@ -157,22 +157,21 @@ applyP = Apply <$> wsP expP <*> wsP expP
 
 --- Patterns
 topLevelPatternP :: Parser Pattern
-topLevelPatternP = wsP (P.char '|') *> choice [ intConstPatP,
-    boolConstPatP,
-    wildcardPatP,
-    listPatP,
+topLevelPatternP = wsP (P.char '|') *> choice [consPatP, listPatP,
     tuplePatP,
-    consPatP,
+    wildcardPatP,
+    boolConstPatP,
+    intConstPatP,
     identifierPatP
   ]
 
 otherPatternP :: Parser Pattern
 otherPatternP = choice [
-  intConstPatP,
-  boolConstPatP,
-  wildcardPatP,
   listPatP,
   tuplePatP,
+  wildcardPatP,
+  intConstPatP,
+  boolConstPatP,
   identifierPatP
   ]
 
@@ -191,7 +190,10 @@ listPatP :: Parser Pattern
 listPatP = ListPat <$> brackets (wsP otherPatternP `P.sepBy` wsP (P.char ';'))
 
 consPatP :: Parser Pattern
-consPatP = otherPatternP `P.chainl1` consOp
+consPatP = consPatPnormal <|> parens consPatPnormal
+
+consPatPnormal :: Parser Pattern
+consPatPnormal = otherPatternP `P.chainl1` consOp
   where
     consOp = ConsPat <$ wsP (stringP "::")
 
@@ -255,16 +257,14 @@ prop_roundtrip_pat e = parse topLevelPatternP (pretty e) == Right e
 -- "begin match y with | false::true -> begin match xy with | true -> true\n                                                        end\n                   end"
 
 
--- >>> P.parse expP "begin match y with | false::true -> begin match xy with | true -> true end end"
--- Left "No parses"
+-- >>> P.parse expP "begin match y with | 1 :: [] -> 1 end"
+-- Right (Match (Var "y") [(ConsPat (IntConstPat 1) (ListPat []),Val (IntVal 1))])
 
 -- >>> P.parse expP "begin match x with | [] -> 1 | x::xs -> 2 end"
 -- Right (Match (Var "x") [(ListPat [],Val (IntVal 1)),(ConsPat (IdentifierPat "x") (IdentifierPat "xs"),Val (IntVal 2))])
 
 
 -- >>> pretty (Match (Var "xy") [(WildcardPat,Match (Var "y") []),(ListPat [BoolConstPat False,IdentifierPat "x0"],Match (Var "X0") [(WildcardPat,Match (Var "X") [(IntConstPat 4,Var "X"),(BoolConstPat False,Val (IntVal (-2)))]),(ConsPat (BoolConstPat False) (BoolConstPat True),Match (Var "X0") [(IntConstPat (-1),Var "X"),(BoolConstPat True,Val (IntVal 4))])]),(BoolConstPat False,Match (Var "xy") [])])
--- "begin match xy with | _ -> begin match y with end\n                    | [false;x0] -> begin match X0 with | _ -> begin match X with | 4 -> X\n                                                                                  | false -> -2\n                                                                                  end\n                                                        | false::true -> begin match X0 with | -1 -> X\n                                                                                             | true -> 4\n                                                                                             end\n                                                        end\n                    | false -> begin match xy with end\n                    end"
-
 
 -- >>> P.parse expP "begin match x with | [] -> begin match y with | 1 -> 0 | 2 -> 1 end end"
 -- Right (Match (Var "x") [(ListPat [],Match (Var "y") [(IntConstPat 1,Val (IntVal 0)),(IntConstPat 2,Val (IntVal 1))])])
@@ -272,3 +272,6 @@ prop_roundtrip_pat e = parse topLevelPatternP (pretty e) == Right e
 -- >>> pretty (IntConstPat 0)
 -- "0"
 
+-- >>> P.parse expP "begin match l with | [] -> [] | (x::xs) -> (f x :: (transform f xs)) end"
+
+-- >>> P.parse expP "(f x :: (transform f xs))"
