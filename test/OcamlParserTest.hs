@@ -84,13 +84,8 @@ test_expression =
         P.parse expP "(f x :: (transform f xs))" ~?= Right (Op2 (Apply (Var "f") (Var "x")) Cons (Apply (Apply (Var "transform") (Var "f")) (Var "xs")))
       ]
 
--- >>> P.parse expP "begin match x with | [] -> 1 | x::xs -> 2 end"
--- Right (Match (Var "x") [(ListPat [],Val (IntVal 1)),(ConsPat (IdentifierPat "x") (IdentifierPat "xs"),Val (IntVal 2))])
-
--- >>> P.parse expP "(f x :: (transform f xs))"
-
 -- >>> runTestTT test_expression
--- Counts {cases = 13, tried = 13, errors = 0, failures = 1}
+-- Counts {cases = 13, tried = 13, errors = 0, failures = 0}
 
 test_op_expression :: Test
 test_op_expression =
@@ -126,17 +121,36 @@ test_pattern =
   "parsing patterns"
   ~: TestList
     [
-      P.parse topLevelPatternP "| 1" ~?= Right (IntConstPat 1),
-      P.parse topLevelPatternP "| true" ~?= Right (BoolConstPat True),
-      P.parse topLevelPatternP "| _" ~?= Right WildcardPat,
-      P.parse topLevelPatternP "| [1; (x, y)]" ~?= Right (ListPat [IntConstPat 1,TuplePat [IdentifierPat "x",IdentifierPat "y"]]),
-      P.parse topLevelPatternP "| (x, 1)" ~?= Right (TuplePat [IdentifierPat "x", IntConstPat 1]),
-      P.parse topLevelPatternP "| x" ~?= Right (IdentifierPat "x"),
-      P.parse topLevelPatternP "| x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
-      P.parse topLevelPatternP "| x::xs::xss" ~?= Right (ConsPat (ConsPat (IdentifierPat "x") (IdentifierPat "xs")) (IdentifierPat "xss")),
-      P.parse topLevelPatternP "| 1 :: []" ~?= Right (ConsPat (IntConstPat 1) (ListPat [])),
-      P.parse topLevelPatternP "|(x::xs)" ~?= Right  (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))
+      P.parse topLevelPatternP "1" ~?= Right (IntConstPat 1),
+      P.parse topLevelPatternP "true" ~?= Right (BoolConstPat True),
+      P.parse topLevelPatternP "_" ~?= Right WildcardPat,
+      P.parse topLevelPatternP "[1; (x, y)]" ~?= Right (ListPat [IntConstPat 1,TuplePat [IdentifierPat "x",IdentifierPat "y"]]),
+      P.parse topLevelPatternP "(x, 1)" ~?= Right (TuplePat [IdentifierPat "x", IntConstPat 1]),
+      P.parse topLevelPatternP "x" ~?= Right (IdentifierPat "x"),
+      P.parse topLevelPatternP "x::xs" ~?= Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs")),
+      P.parse topLevelPatternP "x::xs::xss" ~?= Right (ConsPat (ConsPat (IdentifierPat "x") (IdentifierPat "xs")) (IdentifierPat "xss")),
+      P.parse topLevelPatternP "1 :: []" ~?= Right (ConsPat (IntConstPat 1) (ListPat [])),
+      P.parse topLevelPatternP "(x::xs)" ~?= Right  (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))
     ]
 
 -- >>> runTestTT test_pattern
--- Counts {cases = 10, tried = 10, errors = 0, failures = 0}
+-- Counts {cases = 10, tried = 10, errors = 0, failures = 1}
+
+
+test_all :: IO Counts
+test_all = runTestTT $ TestList [test_value, test_functionVal, test_expression, test_op_expression, test_bop_expression, test_pattern]
+
+-- >>> test_all
+-- Counts {cases = 40, tried = 40, errors = 0, failures = 1}
+
+qc :: IO ()
+qc = do
+  putStrLn "roundtrip_val"
+  QC.quickCheck prop_roundtrip_val
+  putStrLn "roundtrip_exp"
+  QC.quickCheck prop_roundtrip_exp
+  putStrLn "roundtrip_stat"
+  QC.quickCheck prop_roundtrip_stat
+
+  -- to run: 
+  -- stack ghci, :l test/OcamlParserTest.hs, qc
