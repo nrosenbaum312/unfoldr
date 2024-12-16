@@ -1,3 +1,4 @@
+
 module OCamlParser where
 
 import Control.Exception (PatternMatchFail)
@@ -71,7 +72,7 @@ functionValP =
     foldParams :: [Identifier] -> Expression -> Value
     foldParams [] _ = error "No params"
     foldParams [x] ex = FunctionVal x ex
-    foldParams (x : xs) ex = FunctionVal x (foldr FunctionConst ex xs)
+    foldParams (x : xs) ex = FunctionVal x (foldr (\x acc -> Val (FunctionVal x acc)) ex xs)
 
 --- Identifiers
 idP :: Parser Identifier
@@ -86,38 +87,23 @@ varP = Var <$> idP
 valP :: Parser Expression
 valP = Val <$> (intValP <|> boolValP)
 
--- expP :: Parser Expression
--- expP = compP
---   where
---     compP = catP `P.chainl1` opAtLevel (level Gt)
---     catP = sumP `P.chainl1` opAtLevel (level Append)
---     sumP = prodP `P.chainl1` opAtLevel (level Plus)
---     prodP = uopexpP `P.chainl1` opAtLevel (level Times)
---     uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
---     baseP = choice [wsP (parens expP),
---                     listConstP,
---                     tupleConstP,
---                     functionConstP,
---                     ifP,
---                     letP,
---                     matchP,
---                     varP,
---                     valP]
-
 expP :: Parser Expression
-expP = applyP <|> orP
+expP = applyP <|> compP
   where
-    orP = andP `P.chainl1` opAtLevel (level Or)  -- Logical OR (||)
-    andP = eqP `P.chainl1` opAtLevel (level And) -- Logical AND (&&)
-    eqP = cmpP `P.chainl1` opAtLevel (level Eq)  -- Equality and comparison (==, !=, <, >, etc.)
-    cmpP = appendP `P.chainl1` opAtLevel (level Gt)  -- Comparison operators
-    appendP = consP `P.chainl1` opAtLevel (level Append) -- Append operators (e.g., ++)
-    consP = sumP `P.chainl1` opAtLevel (level Cons) -- Cons operator (:)
-    sumP = prodP `P.chainl1` opAtLevel (level Plus) -- Addition and subtraction (+, -)
-    prodP = uopexpP `P.chainl1` opAtLevel (level Times) -- Multiplication, division, mod (*, /, %)
-    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP -- Unary operators (not, -)
-    baseP = wsP (parens expP) <|> listConstP <|> tupleConstP <|> functionConstP <|> ifP <|> letP <|> matchP <|> varP <|> valP
-
+    compP = catP `P.chainl1` opAtLevel (level Gt)
+    catP = sumP `P.chainl1` opAtLevel (level Append)
+    sumP = prodP `P.chainl1` opAtLevel (level Plus)
+    prodP = uopexpP `P.chainl1` opAtLevel (level Times)
+    uopexpP = baseP <|> Op1 <$> uopP <*> uopexpP
+    baseP = choice [wsP (parens expP),
+                    tupleConstP, 
+                    listConstP,
+                    functionConstP,
+                    ifP,
+                    letP,
+                    matchP,
+                    varP,
+                    valP]
 
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
@@ -126,9 +112,13 @@ listConstP :: Parser Expression
 listConstP = ListConst <$> brackets (wsP expP `P.sepBy` wsP (P.char ';'))
 
 tupleConstP :: Parser Expression
-tupleConstP = TupleConst <$> parens (wsP (tupleItemsP `P.sepBy` wsP (P.char ',')) <|> pure [])
-  where
-    tupleItemsP = tupleConstP <|> expP
+tupleConstP =
+  ( \elts -> case elts of
+      [] -> TupleConst []
+      [x] -> x
+      l -> TupleConst elts
+  )
+    <$> parens (wsP (expP `P.sepBy` wsP (P.char ',')))
 
 functionConstP :: Parser Expression
 functionConstP =
@@ -136,8 +126,8 @@ functionConstP =
   where
     foldParams :: [Identifier] -> Expression -> Expression
     foldParams [] _  = error "No params"
-    foldParams [x] ex = FunctionConst x ex
-    foldParams (x : xs) ex = FunctionConst x (foldr FunctionConst ex xs)
+    foldParams [x] ex = Val (FunctionVal x ex)
+    foldParams (x : xs) ex = Val (FunctionVal x (foldr (\x acc -> Val (FunctionVal x acc)) ex xs))
 
 ifP :: Parser Expression
 ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*> (wsP (stringP "else") *> expP)
@@ -145,12 +135,12 @@ ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*>
 matchP :: Parser Expression
 matchP = Match 
     <$> (wsP (stringP "begin match") *> wsP expP <* wsP (stringP "with")) 
-    <*> many (wsP patExpP) <* wsP (stringP "end") where
+    <*> many (wsP patExpP) <* wsP (stringP "end") <* wsP (stringP "end") where
   patExpP :: Parser (Pattern, Expression)
   patExpP = wsP (liftA2 (,) (wsP topLevelPatternP) (wsP (stringP "->") *> wsP expP))
 
 letP :: Parser Expression
-letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> expP <*> (wsP (stringP "in") *> expP)
+letP = Let <$> (wsP (stringP "let") *> idP <* wsP (P.char '=')) <*> wsP expP <*> (wsP (stringP "in") *> expP)
 
 applyP :: Parser Expression
 applyP = Apply <$> wsP expP <*> wsP expP
@@ -198,7 +188,13 @@ consPatPnormal = otherPatternP `P.chainl1` consOp
     consOp = ConsPat <$ wsP (stringP "::")
 
 tuplePatP :: Parser Pattern
-tuplePatP = TuplePat <$> parens (wsP otherPatternP `P.sepBy` wsP (P.char ','))
+tuplePatP = 
+  ( \elts -> case elts of
+      [] -> TuplePat []
+      [x] -> x
+      l -> TuplePat elts
+  )
+    <$> parens (wsP (topLevelPatternP `P.sepBy` wsP (P.char ',')))
 
 wildcardPatP :: Parser Pattern
 wildcardPatP = WildcardPat <$ wsP (P.char '_')
@@ -243,11 +239,14 @@ parseOcaml = do
 prop_roundtrip_exp :: Expression -> Bool
 prop_roundtrip_exp e = parse expP (pretty e) == Right e
 
+prop_roundtrip_stat :: Statement -> Bool
+prop_roundtrip_stat s = parse statementP (pretty s) == Right s
+
 prop_roundtrip_pat :: Pattern -> Bool
 prop_roundtrip_pat e = parse topLevelPatternP (pretty e) == Right e
 
--- >>> PP.pretty (Op2 (Op2 (Var "X") Gt (Val (IntVal 4))) Minus (Op2 (Val (BoolVal False)) Or (Var "X")))
--- "X > 4 - false || X"
+-- >>> PP.pretty (ListConst [Op2 (Val (BoolVal False)) Or (Val (BoolVal False)),TupleConst [Var "x",Var "xy",Val (BoolVal True)],Var "x"])
+-- "[(false) || (false); (x, xy, true); x]"
 
 -- >>> P.parse expP "X > 4 - false || X"
 -- Right (Op2 (Op2 (Var "X") Gt (Op2 (Val (IntVal 4)) Minus (Val (BoolVal False)))) Or (Var "X"))
