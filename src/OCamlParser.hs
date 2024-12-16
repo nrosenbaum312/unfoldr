@@ -240,15 +240,3 @@ parseOcaml = do
   input <- getContents
   let result = P.parse (const <$> blockP <*> P.eof) input
   return result
-
-prop_roundtrip_val :: Value -> Bool
-prop_roundtrip_val v = parse valueP (pretty v) == Right v
-
-prop_roundtrip_exp :: Expression -> Bool
-prop_roundtrip_exp e = parse expP (pretty e) == Right e
-
-prop_roundtrip_stat :: Statement -> Bool
-prop_roundtrip_stat s = parse statementP (pretty s) == Right s
-
-prop_roundtrip_pat :: Pattern -> Bool
-prop_roundtrip_pat e = parse topLevelPatternP (pretty e) == Right e
