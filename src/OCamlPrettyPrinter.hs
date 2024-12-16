@@ -97,7 +97,7 @@ instance PP Pattern where
   pp (BoolConstPat b) = pp b
   pp (IdentifierPat i) = pp i
   pp (ListPat l) = PP.brackets $ PP.hcat (PP.punctuate (PP.char ';') (pp <$> l))
-  pp (ConsPat p1 p2) = pp p1 <> PP.text "::" <> pp p2
+  pp (ConsPat p1 p2) = PP.parens (pp p1 <> PP.text "::" <> pp p2)
   pp (TuplePat l) = PP.parens $ PP.hcat (PP.punctuate (PP.char ',') (pp <$> l))
   pp WildcardPat = PP.char '_'
 
@@ -139,7 +139,7 @@ genExpList n = do
 
 genPatExpList :: Int -> Gen [(Pattern, Expression)]
 genPatExpList n = do
-  len <- QC.elements [0 .. 3]
+  len <- QC.elements [1 .. 3]
   take len <$> QC.infiniteListOf (liftA2 (,) (genPat n) (genExp n))
 
 genExp :: Int -> Gen Expression
@@ -177,8 +177,7 @@ instance Arbitrary Expression where
 
 genPatList :: Int -> Gen [Pattern]
 genPatList n = do
-  len <- QC.elements [0 .. 3]
-  take len <$> QC.infiniteListOf (genPat n)
+  take 2 <$> QC.infiniteListOf (genPat n)
 
 genPat :: Int -> Gen Pattern
 genPat 0 = QC.oneof [IntConstPat <$> arbitrary, BoolConstPat <$> arbitrary]

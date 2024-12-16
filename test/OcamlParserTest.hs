@@ -85,11 +85,12 @@ test_expression =
       ]
 
 -- >>> P.parse expP "begin match x with | [] -> 1 | x::xs -> 2 end"
--- Left "No parses"
+-- Right (Match (Var "x") [(ListPat [],Val (IntVal 1)),(ConsPat (IdentifierPat "x") (IdentifierPat "xs"),Val (IntVal 2))])
 
+-- >>> P.parse expP "(f x :: (transform f xs))"
 
 -- >>> runTestTT test_expression
--- Counts {cases = 13, tried = 13, errors = 0, failures = 2}
+-- Counts {cases = 13, tried = 13, errors = 0, failures = 1}
 
 test_op_expression :: Test
 test_op_expression =
