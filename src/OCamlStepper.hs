@@ -401,9 +401,18 @@ test_stepExpressionToValue :: Test
 test_stepExpressionToValue =
   "stepping expressions"
     ~: TestList
-      [ stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) ~?= Right (IntVal 4)
+      [ stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) ~?= Right (IntVal 4),
+        stepExpToValue (Let "x" (Val (IntVal 10)) (Op2 (Val (IntVal 5)) Plus (Var "x"))) ~?= Right (IntVal 15),
+        stepExpToValue (Let "f" (Val (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 4))))) (Apply (Var "f") (Val (IntVal 5)))) ~?= Right (IntVal 9),
+        stepExpToValue (Let "is_even" (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Val (BoolVal True)) (Val (BoolVal False))))) (Apply (Var "is_even") (Val (IntVal 4)))) ~?= Right (BoolVal True)
       ]
 
+-- >>> runTestTT test_stepExpressionToValue
+-- Counts {cases = 4, tried = 4, errors = 0, failures = 0}
+
+
+-- >>> stepExpToValue (Let "is_even" (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Var "True") (Var "False")))) (Apply (Var "is_even") (Val (IntVal 4))))
+-- Left "Variable True not found! Make sure you've defined it."
 {-
 
 # Substitution Semantics
