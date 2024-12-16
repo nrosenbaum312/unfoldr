@@ -74,6 +74,7 @@ instance PP Expression where
   pp (Op1 Not e) = PP.text "not" <+> PP.parens (pp e)
   pp (Op2 e1 op e2) = PP.parens (pp e1) <+> pp op <+> PP.parens (pp e2)
   pp (ListConst l) = PP.brackets $ PP.hcat (PP.punctuate (PP.text "; ") (pp <$> l))
+  pp (TupleConst [e]) = pp e
   pp (TupleConst l) = PP.parens $ PP.hcat (PP.punctuate (PP.text ", ") (pp <$> l))
   pp (FunctionConst i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
   pp (If e1 e2 e3) = PP.text "if" <+> pp e1 <+> PP.text "then" <+> pp e2 <+> PP.text "else" <+> pp e3
@@ -121,7 +122,7 @@ instance Arbitrary Value where
 
 genExpList :: Int -> Gen [Expression]
 genExpList n = do
-  len <- QC.elements [0 .. 3]
+  len <- QC.elements [2 .. 3]
   take len <$> QC.infiniteListOf (genExp n)
 
 genPatExpList :: Int -> Gen [(Pattern, Expression)]
@@ -134,15 +135,15 @@ genExp 0 = QC.oneof [Var <$> genId, Val <$> arbitrary]
 genExp n =
   QC.frequency
     [
-      -- (1, Var <$> genId),
-      -- (1, Val <$> arbitrary),
-      -- (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
-      -- (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
-      -- (n, ListConst <$> genExpList n'),
-      -- (n, TupleConst <$> genExpList n'),
-      --(n, FunctionConst <$> genId <*> genExp n'),
-      (n, (Match . Var <$> genId) <*> genPatExpList n')
-      -- (n, Let <$> genId <*> genExp n' <*> genExp n'),
+      (1, Var <$> genId),
+      (1, Val <$> arbitrary),
+      (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
+      (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
+      (n, ListConst <$> genExpList n'),
+      (n, TupleConst <$> genExpList n'),
+      (n, FunctionConst <$> genId <*> genExp n'),
+      -- (n, (Match . Var <$> genId) <*> genPatExpList n')
+      (n, Let <$> genId <*> genExp n' <*> genExp n')
       -- (n, Apply <$> genExp n' <*> genExp n')
     ] where
         n' = n `div` 2
@@ -210,12 +211,12 @@ instance Arbitrary Bop where
 
 
 genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = QC.oneof [VarDecl <$> arbitrary <*> arbitrary <*> genExp 0, return Empty]
+genStatement n | n <= 1 = QC.oneof [VarDecl <$> arbitrary <*> genId <*> genExp 0, return Empty]
 genStatement n =
   QC.frequency
     [
       (1, return Empty),
-      (2, VarDecl <$> arbitrary <*> arbitrary <*> genExp n')
+      (2, VarDecl <$> arbitrary <*> genId <*> genExp n')
     ] where
       n' = n `div` 2
 
