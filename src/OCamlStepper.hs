@@ -34,6 +34,7 @@ resolveId id = do
     Just value -> return $ Just value
     Nothing -> return Nothing
 
+-- steps a statement, adding its declaration to the scope
 stepStatement :: Statement -> State Scope ()
 stepStatement (VarDecl r id exp) = do
   s <- State.get
@@ -66,6 +67,7 @@ substitute id valExpression ex@(Let i ve ie) =
   if i == id then ex else Let i (substitute id valExpression ve) (substitute id valExpression ie)
 substitute id valExpression (Apply fn arg) = Apply (substitute id valExpression fn) (substitute id valExpression arg)
 
+-- Extracts all the identifiers from a pattern, for shadowing purposes.
 extractIdsFromPattern :: [Pattern] -> [Identifier]
 extractIdsFromPattern [] = []
 extractIdsFromPattern (pat : pats) =
@@ -107,6 +109,7 @@ data Step e v
 
 type ExpressionStep = Step Expression Value
 
+-- Steps an expression to a value, or a string if there's an error.
 stepExpToValue :: Expression -> Either String Value
 stepExpToValue (Val v) = Right v
 stepExpToValue e =
@@ -115,6 +118,7 @@ stepExpToValue e =
         Left s -> Left s
         Right e' -> stepExpToValue e'
 
+-- Steps a known-good expression once, erroring on failure. Used for testing.
 stepGoodExpToExp :: Expression -> Expression
 stepGoodExpToExp e =
   let s' = largeStepExp e
@@ -122,12 +126,14 @@ stepGoodExpToExp e =
         Left s -> error "Undefined expression generated in test!"
         Right e' -> e'
 
+-- Steps an expression n times, returning the new expression or an error.
 stepExpNToExp :: Int -> Expression -> Either String Expression
 stepExpNToExp 0 e = Right e
 stepExpNToExp i e = do
   next <- State.evalState (largeStepExp e) makeScope
   stepExpNToExp (i - 1) next
 
+-- Steps an expression n times, using the scope.
 stepExpN :: Int -> Expression -> State Scope (Either String Expression)
 stepExpN 0 e = return $ Right e
 stepExpN i e = do
@@ -187,6 +193,7 @@ stepVar id = do
     Nothing -> return $ Left ("Variable " ++ id ++ " not found! Make sure you've defined it.")
     Just e -> return $ Right (Large e)
 
+-- Steps a unary operation.
 stepUop :: Uop -> Expression -> State Scope (Either String ExpressionStep)
 stepUop uop (Val v) = return $ do
   v' <- evalUop uop v
@@ -199,11 +206,13 @@ stepUop uop e = do
     Right (Final v) -> return $ Right $ Final v
     _ -> return e'
 
+-- Evaluates a unary expression.
 evalUop :: Uop -> Value -> Either String Value
 evalUop Neg (IntVal i) = Right $ IntVal (-i)
 evalUop Not (BoolVal b) = Right $ BoolVal (not b)
 evalUop u v = Left $ "Type error: can't apply operator " ++ show u ++ " to a value of type " ++ showType v ++ "!"
 
+-- Steps a binary operation.
 stepBop :: Expression -> Bop -> Expression -> State Scope (Either String ExpressionStep)
 stepBop (Val v1) bop (Val v2) = return $ do
   res <- evalBop v1 bop v2
@@ -223,6 +232,7 @@ stepBop l bop r = do
     Right (Final v) -> return $ Right $ Large (Op2 (Val v) bop r)
     _ -> return l'
 
+-- Evaluates a binary operation.
 evalBop :: Value -> Bop -> Value -> Either String Value
 evalBop (IntVal i1) Plus (IntVal i2) = Right $ IntVal (i1 + i2)
 evalBop (IntVal i1) Minus (IntVal i2) = Right $ IntVal (i1 - i2)
@@ -256,6 +266,7 @@ evalBop l b r = Left $ "Type error: can't perform operation " ++ show b ++ " on 
 -- >>> State.runState (stepListConst [(Val (IntVal 2)), Op1 Neg (Val (IntVal 1)), Op1 Neg (Val (IntVal 1))]) makeScope
 -- (Right (Large (ListConst [Val (IntVal 2),Val (IntVal (-1)),Op1 Neg (Val (IntVal 1))])),fromList [])
 
+-- Steps a list const.
 stepListConst :: [Expression] -> State Scope (Either String ExpressionStep)
 stepListConst [] = return $ Right $ Small $ Val $ ListVal []
 stepListConst l = do
@@ -266,6 +277,7 @@ stepListConst l = do
     Right (Final vs) -> return $ Right $ Final $ ListVal vs
     Left s -> return $ Left s
 
+-- Steps a list of expression one step closer to a list of values.
 valueify :: [Expression] -> State Scope (Either String (Step [Expression] [Value]))
 valueify [] = return $ Right $ Small []
 valueify (Val v : xs) = do
@@ -290,6 +302,7 @@ valueify (x : xs) = do
     Right (Final v) -> return $ Right $ Large $ Val v : xs
     Left s -> return $ Left s
 
+-- Steps an if statement.
 stepIf :: Expression -> Expression -> Expression -> State Scope (Either String ExpressionStep)
 stepIf (Val v) ife elsee = return $ do
   case v of
@@ -304,6 +317,7 @@ stepIf guard ife elsee = do
     Right (Final v) -> return $ Right $ Large (If (Val v) ife elsee)
     _ -> return g'
 
+-- Steps a let expression.
 stepLet :: Identifier -> Expression -> Expression -> State Scope (Either String ExpressionStep)
 stepLet id (Val v) ine = return $ Right $ Large $ substitute id (Val v) ine
 stepLet id val ine = do
@@ -314,6 +328,7 @@ stepLet id val ine = do
     Right (Final v) -> return $ Right $ Large (Let id (Val v) ine)
     _ -> return v'
 
+-- Steps a function application.
 stepApply :: Expression -> Expression -> State Scope (Either String ExpressionStep)
 stepApply (Val (FunctionVal arg body)) argVal = return $ Right $ Large $ substitute arg argVal body
 stepApply (Val _) _ = return $ Left "Type error: only functions can be applied!"
@@ -325,6 +340,8 @@ stepApply fn argVal = do
     Right (Final v) -> return $ Right $ Large (Apply (Val v) argVal)
     _ -> return f'
 
+-- Performs a match, attempting to pair identifiers with expressions. Returns
+-- Nothing if the value does not match the pattern.
 match :: Value -> Pattern -> Maybe [(Identifier, Expression)]
 match v (IdentifierPat id) = Just [(id, Val v)]
 match v WildcardPat = Just []
@@ -342,6 +359,7 @@ match (ListVal (p : ps)) (ConsPat elp lp) = do
   return $ elBindings ++ lBindings
 match _ _ = Nothing
 
+-- Steps a match expression.
 stepMatch :: Expression -> [(Pattern, Expression)] -> State Scope (Either String ExpressionStep)
 stepMatch e@(Val v) ((p, arm) : ps) =
   case match v p of
