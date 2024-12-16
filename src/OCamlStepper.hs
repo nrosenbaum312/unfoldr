@@ -7,16 +7,16 @@ import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
+import OCamlParser
+import OCamlPrettyPrinter
 import OCamlSyntax
 import OCamlTypes
+import Parser
 import State
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck (Property)
 import Test.QuickCheck qualified as QC
 import Text.Read (readMaybe)
-import OCamlPrettyPrinter
-import OCamlParser
-import Parser
 
 -- make an empty scope
 makeScope :: Scope
@@ -45,7 +45,7 @@ stepStatement Empty = return ()
 
 stepBlock :: Block -> State Scope ()
 stepBlock (Block []) = return ()
-stepBlock (Block (s:ss)) = do
+stepBlock (Block (s : ss)) = do
   stepStatement s
   stepBlock (Block ss)
 
@@ -282,12 +282,6 @@ evalBop v Cons (ListVal l) =
           Left $ "Type error: can't cons an element of type " ++ show (typeof v) ++ " into a list of type " ++ show l
 evalBop l b r = Left $ "Type error: can't perform operation " ++ show b ++ " on values of type " ++ show (typeof l) ++ " and " ++ show (typeof r)
 
--- >>> State.runState (stepListConst [Op1 Neg (Val (IntVal 1))]) makeScope
--- (Right (Final (ListVal [IntVal (-1)])),fromList [])
-
--- >>> State.runState (stepListConst [(Val (IntVal 2)), Op1 Neg (Val (IntVal 1)), Op1 Neg (Val (IntVal 1))]) makeScope
--- (Right (Large (ListConst [Val (IntVal 2),Val (IntVal (-1)),Op1 Neg (Val (IntVal 1))])),fromList [])
-
 -- Steps a list const.
 stepListConst :: [Expression] -> State Scope (Either String ExpressionStep)
 stepListConst [] = return $ Right $ Small $ Val $ ListVal []
@@ -373,7 +367,7 @@ match (TupleVal t) (TuplePat pats) = do
   bindings <- zipWithM match t pats
   return (concat bindings)
 match (ListVal l) (ListPat pats) =
-  if length l == length pats 
+  if length l == length pats
     then do
       bindings <- zipWithM match l pats
       return (concat bindings)
@@ -410,40 +404,9 @@ test_stepExpressionToValue =
       [ stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) ~?= Right (IntVal 4)
       ]
 
--- >>> State.evalState (stepLet "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) makeScope
--- Right (Large (Apply (Val (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 2))))) (Val (IntVal 2))))
-transform = parse expP "fun f -> fun l -> \
-  \begin match l with \
-  \| [] -> [] \
-  \| x::xs -> (f x :: (transform f xs)) \
-  \end"
-
--- >>> transform
-
--- >>> parse expP "fun x -> if x mod 2 = 0 then true else false"
--- Right (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Val (BoolVal True)) (Val (BoolVal False)))))
-
--- >>> pretty $ stepExpNToExp 0 s
--- >>> pretty $ stepExpNToExp 1 s
--- >>> pretty $ stepExpNToExp 2 s
--- >>> pretty $ stepExpNToExp 3 s
--- >>> pretty $ stepExpNToExp 4 s
--- >>> pretty $ stepExpNToExp 5 s
--- "let f = (fun x -> (fun y -> x + y)) in\n((f 2) 2 + 3)"
--- "(((fun x -> (fun y -> x + y)) 2) 2 + 3)"
--- "((fun y -> 2 + y) 2 + 3)"
--- "2 + 2 + 3"
--- "2 + 5"
--- "7"
-
 {-
 
 # Substitution Semantics
-
-(fun x -> fun y -> x + y) 1 2
-==> (fun y -> 1 + y) 2
-==> 1 + 2
-==> 3
 
 Substitution recursively replaces variables with values, up until they're
 shadowed by a same-name argument, let declaration, or pattern variable.
@@ -494,13 +457,6 @@ branch, substituted with the values, in one "large" step.
 ## Let
 Step the expression to a value; substitute the variable for the value in the
 body of the let statement.
-
-Let "x" (Val (IntVal 3)) (Op2 (Var "x") Times (Val (IntVal 2)))
-
-smallStepLet id valExpression inExpression =
-  substitute id valExpression inExpression
-
-(Op2 (Val (IntVal 3)) Times (Val (IntVal 2)))
 
 ## Apply
 Step the expression to a function value; then step the arguments to values, in
