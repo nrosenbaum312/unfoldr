@@ -71,7 +71,7 @@ functionValP =
     foldParams :: [Identifier] -> Expression -> Value
     foldParams [] _ = error "No params"
     foldParams [x] ex = FunctionVal x ex
-    foldParams (x : xs) ex = FunctionVal x (foldr FunctionConst ex xs)
+    foldParams (x : xs) ex = FunctionVal x (foldr (\x acc -> Val (FunctionVal x acc)) ex xs)
 
 --- Identifiers
 idP :: Parser Identifier
@@ -121,8 +121,8 @@ functionConstP =
   where
     foldParams :: [Identifier] -> Expression -> Expression
     foldParams [] _  = error "No params"
-    foldParams [x] ex = FunctionConst x ex
-    foldParams (x : xs) ex = FunctionConst x (foldr FunctionConst ex xs)
+    foldParams [x] ex = Val (FunctionVal x ex)
+    foldParams (x : xs) ex = Val (FunctionVal x (foldr (\x acc -> Val (FunctionVal x acc)) ex xs))
 
 ifP :: Parser Expression
 ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*> (wsP (stringP "else") *> expP)

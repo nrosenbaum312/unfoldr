@@ -7,7 +7,6 @@ import Data.List qualified as List
 import Data.Map (Map, (!?))
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
-import OCamlParser qualified
 import OCamlSyntax
 import OCamlTypes 
 import State
@@ -15,6 +14,9 @@ import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck (Property)
 import Test.QuickCheck qualified as QC
 import Text.Read (readMaybe)
+import OCamlPrettyPrinter
+import OCamlParser
+import Parser
 
 -- make an empty scope
 makeScope :: Scope
@@ -32,9 +34,19 @@ resolveId id = do
     Just value -> return $ Just value
     Nothing -> return Nothing
 
+stepStatement :: Statement -> State Scope ()
+stepStatement (VarDecl r id exp) = do
+  s <- State.get
+  let s' = addBinding id exp s
+  put s'
+  return ()
+stepStatement Empty = return ()
+
 -- Substitutes an id for its bound expression in the sub-expression
 substitute :: Identifier -> Expression -> Expression -> Expression
 substitute id valExpression (Var vid) = if vid == id then valExpression else Var vid
+substitute id valExpression ex@(Val (FunctionVal aid body)) = 
+  if aid == id then ex else Val (FunctionVal aid (substitute id valExpression body))
 substitute id valExpression (Val value) = Val value
 substitute id valExpression (Op1 uop e) = Op1 uop (substitute id valExpression e)
 substitute id valExpression (Op2 e1 bop e2) = Op2 (substitute id valExpression e1) bop (substitute id valExpression e2)
@@ -110,6 +122,12 @@ stepGoodExpToExp e =
         Left s -> error "Undefined expression generated in test!"
         Right e' -> e'
 
+stepExpNToExp :: Int -> Expression -> Either String Expression
+stepExpNToExp 0 e = Right e
+stepExpNToExp i e = do
+  next <- State.evalState (largeStepExp e) makeScope
+  stepExpNToExp (i - 1) next
+
 stepExpN :: Int -> Expression -> State Scope (Either String Expression)
 stepExpN 0 e = return $ Right e
 stepExpN i e = do
@@ -142,7 +160,7 @@ stepExp (Op1 uop exp) = stepUop uop exp
 stepExp (Op2 e1 bop e2) = stepBop e1 bop e2
 stepExp (ListConst es) = stepListConst es
 stepExp (TupleConst es) = stepListConst es
-stepExp (FunctionConst id f) = return $ Right $ Small $ Val (FunctionVal id f)
+stepExp (FunctionConst id f) = return $ Right $ Final (FunctionVal id f)
 stepExp (If g i e) = stepIf g i e
 stepExp (Match val pats) = stepMatch val pats
 stepExp (Let id val ine) = stepLet id val ine
@@ -351,8 +369,30 @@ test_stepExpressionToValue =
 -- >>> State.evalState (stepLet "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) makeScope
 -- Right (Large (Apply (Val (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 2))))) (Val (IntVal 2))))
 
--- >>> stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2))))
--- Right (IntVal 4)
+s = Let "f" (Val $ FunctionVal "x" (Val $ FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))) (Apply (Apply (Var "f") (Val (IntVal 2))) (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3))))
+s' = Apply (Apply (Val (FunctionVal "x" (Val (FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))))) (Val (IntVal 2))) (Op2 (Val (IntVal 2)) Plus (Val (IntVal 3)))
+s'' = Apply (Val (FunctionVal "x" (Val (FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))))) (Val (IntVal 2))
+transform = parse expP "fun f -> fun l -> \
+  \begin match l with \
+  \| [] -> [] \
+  \| (x::xs) -> (f x :: (transform f xs)) \
+  \end"
+
+-- >>> transform
+-- Right (Val (FunctionVal "f" (Val (FunctionVal "l" (Match (Var "l") [(ListPat [],ListConst [])])))))
+
+-- >>> pretty $ stepExpNToExp 0 s
+-- >>> pretty $ stepExpNToExp 1 s
+-- >>> pretty $ stepExpNToExp 2 s
+-- >>> pretty $ stepExpNToExp 3 s
+-- >>> pretty $ stepExpNToExp 4 s
+-- >>> pretty $ stepExpNToExp 5 s
+-- "let f = (fun x -> (fun y -> x + y)) in\n((f 2) 2 + 3)"
+-- "(((fun x -> (fun y -> x + y)) 2) 2 + 3)"
+-- "((fun y -> 2 + y) 2 + 3)"
+-- "2 + 2 + 3"
+-- "2 + 5"
+-- "7"
 
 {-
 
@@ -423,4 +463,5 @@ smallStepLet id valExpression inExpression =
 ## Apply
 Step the expression to a function value; then step the arguments to values, in
 order.
+
 -}

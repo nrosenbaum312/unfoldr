@@ -25,7 +25,12 @@ instance PP Value where
   pp (BoolVal b) = pp b
   pp (TupleVal t) = PP.parens $ printList t
   pp (ListVal l) = PP.brackets $ printList l
-  pp (FunctionVal i e) = PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
+  pp (FunctionVal i e) = PP.parens $ PP.text "fun" <+> pp i <+> PP.text "->" <+> pp e
+
+instance PP (Either String Expression) where
+  pp :: Either String Expression -> Doc
+  pp (Left s) = PP.text $ "(!) " ++ s
+  pp (Right e) = pp e
 
 instance PP Uop where
   pp Neg = PP.char '-'
@@ -82,7 +87,7 @@ instance PP Expression where
     printList [] = PP.text "end"
     printList ((p, e) : xs) = PP.char '|' <+> pp p <+> PP.text "->" <+> pp e PP.$+$ printList xs
   pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$+$ pp e2
-  pp (Apply f a) = pp f <+> pp a
+  pp (Apply f a) = PP.parens (pp f <+> pp a)
 
 instance PP Pattern where
   pp :: Pattern -> Doc
