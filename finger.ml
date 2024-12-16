@@ -51,11 +51,11 @@ let rec in_both = fun names1 names2 ->
   end
 
 let rec merge = fun l1 l2 ->
-  begin match l1, l2 with
-    | [], []               -> []
-    | x::tail, []          -> x::(merge tail l2)
-    | [], x::tail          -> x::(merge l1 tail)
-    | x1::tail1, x2::tail2 -> x1::x2::(merge tail1 tail2)
+  begin match (l1, l2) with
+    | ([], [])               -> []
+    | (x::tail, [])          -> x::(merge tail l2)
+    | ([], x::tail)          -> x::(merge l1 tail)
+    | (x1::tail1, x2::tail2) -> x1::(x2::(merge tail1 tail2))
   end
 
 let rec is_sorted = fun l ->
@@ -66,20 +66,20 @@ let rec is_sorted = fun l ->
   end
 
 let rec merge_sorted = fun l1 l2 ->
-  begin match l1, l2 with
-    | [], []               -> []
-    | x::tail, []          -> x::(merge_sorted tail l2)
-    | [], x::tail          -> x::(merge_sorted l1 tail)
-    | x1::tail1, x2::tail2 -> if x2 > x1 then x1::(merge_sorted tail1 l2)
+  begin match (l1, l2) with
+    | ([], [])               -> []
+    | (x::tail, [])          -> x::(merge_sorted tail l2)
+    | ([], x::tail)          -> x::(merge_sorted l1 tail)
+    | (x1::tail1, x2::tail2) -> if x2 > x1 then x1::(merge_sorted tail1 l2)
       else x2::(merge_sorted l1 tail2)
   end
 
 let rec is_prefix_of = fun l1 l2 ->
-  begin match l1, l2 with
-    | [], []               -> true
-    | x1::tail1, []        -> false
-    | [], x2::tail2        -> true
-    | x1::tail1, x2::tail2 -> x1 = x2 && (is_prefix_of tail1 tail2)
+  begin match (l1, l2) with
+    | ([], [])               -> true
+    | (x1::tail1, [])        -> false
+    | ([], x2::tail2)        -> true
+    | (x1::tail1, x2::tail2) -> x1 = x2 && (is_prefix_of tail1 tail2)
   end
 
 let rec sublist = fun l1 l2 ->

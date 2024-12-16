@@ -279,6 +279,8 @@ evalBop v Cons (ListVal l) =
           Right (ListVal (v : l))
         else
           Left $ "Type error: can't cons an element of type " ++ show (typeof v) ++ " into a list of type " ++ show ltype
+evalBop (ListVal l1) Eq (ListVal l2) = Right $ BoolVal (l1 == l2)
+evalBop (TupleVal l1) Eq (TupleVal l2) = Right $ BoolVal (l1 == l2)
 evalBop l b r = Left $ "Type error: can't perform operation " ++ show b ++ " on values of type " ++ show (typeof l) ++ " and " ++ show (typeof r)
 
 -- Steps a list const.
