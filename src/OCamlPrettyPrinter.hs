@@ -95,7 +95,7 @@ instance PP Expression where
       printList ((p, e) : xs) =
         PP.vcat $
           (PP.char '|' <+> pp p <+> PP.text "->" <+> pp e) : [printList xs]
-  pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$$ pp e2
+  pp (Let i e1 e2) = PP.text "let" <+> pp i <+> PP.char '=' <+> pp e1 <+> PP.text "in" PP.$$ PP.nest 4 (pp e2)
   pp (Apply f a) = PP.parens (PP.parens (pp f) <+> PP.parens (pp a))
 
 instance PP Pattern where

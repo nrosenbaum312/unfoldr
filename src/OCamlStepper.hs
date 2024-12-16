@@ -184,7 +184,7 @@ stepExp (Val val) = return $ Right $ Final val
 stepExp (Op1 uop exp) = stepUop uop exp
 stepExp (Op2 e1 bop e2) = stepBop e1 bop e2
 stepExp (ListConst es) = stepListConst es
-stepExp (TupleConst es) = stepListConst es
+stepExp (TupleConst es) = stepTupleConst es
 stepExp (FunctionConst id f) = return $ Right $ Final (FunctionVal id f)
 stepExp (If g i e) = stepIf g i e
 stepExp (Match val pats) = stepMatch val pats
@@ -279,7 +279,7 @@ evalBop v Cons (ListVal l) =
         then
           Right (ListVal (v : l))
         else
-          Left $ "Type error: can't cons an element of type " ++ show (typeof v) ++ " into a list of type " ++ show l
+          Left $ "Type error: can't cons an element of type " ++ show (typeof v) ++ " into a list of type " ++ show ltype
 evalBop l b r = Left $ "Type error: can't perform operation " ++ show b ++ " on values of type " ++ show (typeof l) ++ " and " ++ show (typeof r)
 
 -- Steps a list const.
@@ -291,6 +291,17 @@ stepListConst l = do
     Right (Small r') -> return $ Right $ Small $ ListConst r'
     Right (Large r') -> return $ Right $ Large $ ListConst r'
     Right (Final vs) -> return $ Right $ Final $ ListVal vs
+    Left s -> return $ Left s
+
+-- Steps a tuple const.
+stepTupleConst :: [Expression] -> State Scope (Either String ExpressionStep)
+stepTupleConst [] = return $ Right $ Small $ Val $ TupleVal []
+stepTupleConst l = do
+  es <- valueify l
+  case es of
+    Right (Small r') -> return $ Right $ Small $ TupleConst r'
+    Right (Large r') -> return $ Right $ Large $ TupleConst r'
+    Right (Final vs) -> return $ Right $ Final $ TupleVal vs
     Left s -> return $ Left s
 
 -- Steps a list of expression one step closer to a list of values.
@@ -401,9 +412,21 @@ test_stepExpressionToValue :: Test
 test_stepExpressionToValue =
   "stepping expressions"
     ~: TestList
-      [ stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) ~?= Right (IntVal 4)
+      [ stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) ~?= Right (IntVal 4),
+        stepExpToValue (Let "x" (Val (IntVal 10)) (Op2 (Val (IntVal 5)) Plus (Var "x"))) ~?= Right (IntVal 15),
+        stepExpToValue (Let "f" (Val (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 4))))) (Apply (Var "f") (Val (IntVal 5)))) ~?= Right (IntVal 9),
+        stepExpToValue (Let "is_even" (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Val (BoolVal True)) (Val (BoolVal False))))) (Apply (Var "is_even") (Val (IntVal 4)))) ~?= Right (BoolVal True),
+        stepExpToValue (Let "x" (Val (IntVal 10)) (Let "x" (Val (IntVal 20)) (Var "x"))) ~?= Right (IntVal 20),
+        stepExpToValue (Match (ListConst [Val (IntVal 1),Val (IntVal 2),Val (IntVal 3)]) [(ListPat [],Val (IntVal 0)),(ConsPat (IdentifierPat "x") (IdentifierPat "xs"),Var "x")]) ~?= Right (IntVal 1),
+        stepExpToValue (Let "x" (TupleConst [Val (IntVal 1),Val (IntVal 2)]) (Op2 (Var "x") Cons (ListConst []))) ~?= Right (ListVal [TupleVal [IntVal 1,IntVal 2]])
       ]
 
+-- >>> runTestTT test_stepExpressionToValue
+-- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
+
+
+-- >>> stepExpToValue (Let "x" (TupleConst [Val (IntVal 1),Val (IntVal 2)]) (Op2 (Var "x") Cons (ListConst [])))
+-- Right (ListVal [ListVal [IntVal 1,IntVal 2]])
 {-
 
 # Substitution Semantics
