@@ -17,7 +17,7 @@ test_print_vals =
         ]
 
 -- >>> runTestTT test_print_vals
--- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
+-- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
 
 test_print_expressions :: Test
 test_print_expressions = 
@@ -39,7 +39,7 @@ test_print_expressions =
       ]
 
 -- >>> runTestTT test_print_expressions
--- Counts {cases = 11, tried = 11, errors = 0, failures = 0}
+-- Counts {cases = 11, tried = 11, errors = 0, failures = 6}
 
 test_print_patterns :: Test
 test_print_patterns =

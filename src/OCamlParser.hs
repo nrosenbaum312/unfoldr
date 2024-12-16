@@ -1,4 +1,5 @@
-
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use lambda-case" #-}
 module OCamlParser where
 
 import Control.Exception (PatternMatchFail)
@@ -18,7 +19,7 @@ wsP :: Parser a -> Parser a
 wsP p = p <* many P.space
 
 parens :: Parser a -> Parser a
-parens x = (P.between (P.char '(') x (P.char ')')) <|> (P.between (P.string "begin") x (P.string "end"))
+parens x = P.between (P.char '(') x (P.char ')') <|> P.between (P.string "begin") x (P.string "end")
 
 brackets :: Parser a -> Parser a
 brackets x = P.between (stringP "[") x (stringP "]")
@@ -73,7 +74,7 @@ functionValP =
     foldParams :: [Identifier] -> Expression -> Value
     foldParams [] _ = error "No params"
     foldParams [x] ex = FunctionVal x ex
-    foldParams (x : xs) ex = FunctionVal x (foldr (\x acc -> Val (FunctionVal x acc)) ex xs)
+    foldParams (x : xs) ex = FunctionVal x (foldr FunctionConst ex xs)
 
 --- Identifiers
 idP :: Parser Identifier
@@ -86,11 +87,12 @@ varP :: Parser Expression
 varP = Var <$> idP
 
 valP :: Parser Expression
-valP = Val <$> (intValP <|> boolValP)
+valP = Val <$> (intValP <|> boolValP <|> functionValP)
 
 expP :: Parser Expression
-expP = applyP <|> compP
+expP = boolP
   where
+    boolP = compP `P.chainl1` opAtLevel (level And)
     compP = catP `P.chainl1` opAtLevel (level Gt)
     catP = sumP `P.chainl1` opAtLevel (level Append)
     sumP = prodP `P.chainl1` opAtLevel (level Plus)
@@ -136,7 +138,7 @@ ifP = If <$> (wsP (stringP "if") *> expP) <*> (wsP (stringP "then") *> expP) <*>
 matchP :: Parser Expression
 matchP = Match 
     <$> (wsP (stringP "begin match") *> wsP expP <* wsP (stringP "with")) 
-    <*> many (wsP patExpP) <* wsP (stringP "end") <* wsP (stringP "end") where
+    <*> many (wsP patExpP) <* wsP (stringP "end") where
   patExpP :: Parser (Pattern, Expression)
   patExpP = wsP (liftA2 (,) (wsP topLevelPatternP) (wsP (stringP "->") *> wsP expP))
 
@@ -148,13 +150,16 @@ applyP = Apply <$> wsP expP <*> wsP expP
 
 --- Patterns
 topLevelPatternP :: Parser Pattern
-topLevelPatternP = wsP (P.char '|') *> choice [consPatP, listPatP,
+topLevelPatternP = wsP (P.char '|') *> wsP
+  (choice [
     tuplePatP,
+    consPatP,
+    listPatP,
     wildcardPatP,
     boolConstPatP,
     intConstPatP,
     identifierPatP
-  ]
+  ])
 
 otherPatternP :: Parser Pattern
 otherPatternP = choice [
@@ -195,7 +200,7 @@ tuplePatP =
       [x] -> x
       l -> TuplePat elts
   )
-    <$> parens (wsP (topLevelPatternP `P.sepBy` wsP (P.char ',')))
+    <$> parens (wsP (otherPatternP `P.sepBy` wsP (P.char ',')))
 
 wildcardPatP :: Parser Pattern
 wildcardPatP = WildcardPat <$ wsP (P.char '_')
@@ -237,6 +242,9 @@ parseOcaml = do
   let result = P.parse (const <$> blockP <*> P.eof) input
   return result
 
+prop_roundtrip_val :: Value -> Bool
+prop_roundtrip_val v = parse valueP (pretty v) == Right v
+
 prop_roundtrip_exp :: Expression -> Bool
 prop_roundtrip_exp e = parse expP (pretty e) == Right e
 
@@ -245,33 +253,3 @@ prop_roundtrip_stat s = parse statementP (pretty s) == Right s
 
 prop_roundtrip_pat :: Pattern -> Bool
 prop_roundtrip_pat e = parse topLevelPatternP (pretty e) == Right e
-
--- >>> PP.pretty (ListConst [Op2 (Val (BoolVal False)) Or (Val (BoolVal False)),TupleConst [Var "x",Var "xy",Val (BoolVal True)],Var "x"])
--- "[(false) || (false); (x, xy, true); x]"
-
--- >>> P.parse expP "X > 4 - false || X"
--- Right (Op2 (Op2 (Var "X") Gt (Op2 (Val (IntVal 4)) Minus (Val (BoolVal False)))) Or (Var "X"))
-
-
--- >>> pretty (Match (Var "y") [(ConsPat (BoolConstPat False) (BoolConstPat True),Match (Var "xy") [(BoolConstPat True,Val (BoolVal True))])])
--- "begin match y with | false::true -> begin match xy with | true -> true\n                                                        end\n                   end"
-
-
--- >>> P.parse expP "begin match y with | 1 :: [] -> 1 end"
--- Right (Match (Var "y") [(ConsPat (IntConstPat 1) (ListPat []),Val (IntVal 1))])
-
--- >>> P.parse expP "begin match x with | [] -> 1 | x::xs -> 2 end"
--- Right (Match (Var "x") [(ListPat [],Val (IntVal 1)),(ConsPat (IdentifierPat "x") (IdentifierPat "xs"),Val (IntVal 2))])
-
-
--- >>> pretty (Match (Var "xy") [(WildcardPat,Match (Var "y") []),(ListPat [BoolConstPat False,IdentifierPat "x0"],Match (Var "X0") [(WildcardPat,Match (Var "X") [(IntConstPat 4,Var "X"),(BoolConstPat False,Val (IntVal (-2)))]),(ConsPat (BoolConstPat False) (BoolConstPat True),Match (Var "X0") [(IntConstPat (-1),Var "X"),(BoolConstPat True,Val (IntVal 4))])]),(BoolConstPat False,Match (Var "xy") [])])
-
--- >>> P.parse expP "begin match x with | [] -> begin match y with | 1 -> 0 | 2 -> 1 end end"
--- Right (Match (Var "x") [(ListPat [],Match (Var "y") [(IntConstPat 1,Val (IntVal 0)),(IntConstPat 2,Val (IntVal 1))])])
-
--- >>> pretty (IntConstPat 0)
--- "0"
-
--- >>> P.parse expP "begin match l with | [] -> [] | (x::xs) -> (f x :: (transform f xs)) end"
-
--- >>> P.parse expP "(f x :: (transform f xs))"

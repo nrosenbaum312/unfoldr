@@ -66,9 +66,9 @@ test_expression =
         P.parse expP "[(1,1); (2,2)]" ~?= Right (ListConst [TupleConst [Val (IntVal 1), Val (IntVal 1)], TupleConst [Val (IntVal 2), Val (IntVal 2)]]),
         P.parse expP "(1, x)" ~?= Right (TupleConst [Val (IntVal 1), Var "x"]),
         P.parse expP "fun x y -> x + y"
-          ~?= Right (FunctionConst "x" (FunctionConst "y" (Op2 (Var "x") Plus (Var "y")))),
+          ~?= Right (Val (FunctionVal "x" (Val (FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))))),
         P.parse expP "fun x -> fun y -> x + y"
-          ~?= Right (FunctionConst "x" (FunctionConst "y" (Op2 (Var "x") Plus (Var "y")))),
+          ~?= Right (Val (FunctionVal "x" (Val (FunctionVal "y" (Op2 (Var "x") Plus (Var "y")))))),
         P.parse expP "if true then 1 else 0"
           ~?= Right (If (Val (BoolVal True)) (Val (IntVal 1)) (Val (IntVal 0))),
         P.parse expP "let x = 1 in x + 1"
@@ -84,8 +84,12 @@ test_expression =
         P.parse expP "(f x :: (transform f xs))" ~?= Right (Op2 (Apply (Var "f") (Var "x")) Cons (Apply (Apply (Var "transform") (Var "f")) (Var "xs")))
       ]
 
+-- >>> P.parse expP "begin match x with | [] -> 1 | x::xs -> 2 end"
+-- Left "No parses"
+
+
 -- >>> runTestTT test_expression
--- Counts {cases = 12, tried = 12, errors = 0, failures = 0}
+-- Counts {cases = 13, tried = 13, errors = 0, failures = 2}
 
 test_op_expression :: Test
 test_op_expression =
@@ -135,7 +139,3 @@ test_pattern =
 
 -- >>> runTestTT test_pattern
 -- Counts {cases = 10, tried = 10, errors = 0, failures = 0}
-
-
--- >>>  P.parse topLevelPatternP "| (x::xs)"
--- Right (ConsPat (IdentifierPat "x") (IdentifierPat "xs"))

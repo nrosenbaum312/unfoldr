@@ -113,13 +113,19 @@ instance PP Statement where
 genId :: Gen Identifier
 genId = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
 
+genVal :: Int -> Gen Value
+genVal 0 = QC.oneof [IntVal <$> arbitrary, BoolVal <$> arbitrary]
+genVal n =
+  QC.frequency
+    [
+      (n, IntVal <$> arbitrary),
+      (n, BoolVal <$> arbitrary)
+    ] where
+        n' = n `div` 2
+
 instance Arbitrary Value where
   arbitrary :: Gen Value
-  arbitrary =
-    QC.oneof
-      [ IntVal <$> arbitrary,
-        BoolVal <$> arbitrary
-      ]
+  arbitrary = QC.sized genVal
   shrink :: Value -> [Value]
   shrink i@(IntVal _i) = return i
   shrink b@(BoolVal _b) = return b
@@ -142,13 +148,11 @@ genExp n =
   QC.frequency
     [
       (1, Var <$> genId),
-      (1, Val <$> arbitrary),
       (n `min` 10, Op1 <$> arbitrary <*> genExp n'),
       (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
       (n, ListConst <$> genExpList n'),
       (n, TupleConst <$> genExpList n'),
-      (n, FunctionConst <$> genId <*> genExp n'),
-      -- (n, (Match . Var <$> genId) <*> genPatExpList n')
+      (n, (Match . Var <$> genId) <*> genPatExpList n'),
       (n, Let <$> genId <*> genExp n' <*> genExp n')
       -- (n, Apply <$> genExp n' <*> genExp n')
     ] where
