@@ -404,15 +404,18 @@ test_stepExpressionToValue =
       [ stepExpToValue (Let "f" (FunctionConst "x" (Op2 (Var "x") Plus (Val (IntVal 2)))) (Apply (Var "f") (Val (IntVal 2)))) ~?= Right (IntVal 4),
         stepExpToValue (Let "x" (Val (IntVal 10)) (Op2 (Val (IntVal 5)) Plus (Var "x"))) ~?= Right (IntVal 15),
         stepExpToValue (Let "f" (Val (FunctionVal "x" (Op2 (Var "x") Plus (Val (IntVal 4))))) (Apply (Var "f") (Val (IntVal 5)))) ~?= Right (IntVal 9),
-        stepExpToValue (Let "is_even" (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Val (BoolVal True)) (Val (BoolVal False))))) (Apply (Var "is_even") (Val (IntVal 4)))) ~?= Right (BoolVal True)
+        stepExpToValue (Let "is_even" (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Val (BoolVal True)) (Val (BoolVal False))))) (Apply (Var "is_even") (Val (IntVal 4)))) ~?= Right (BoolVal True),
+        stepExpToValue (Let "x" (Val (IntVal 10)) (Let "x" (Val (IntVal 20)) (Var "x"))) ~?= Right (IntVal 20),
+        stepExpToValue (Match (ListConst [Val (IntVal 1),Val (IntVal 2),Val (IntVal 3)]) [(ListPat [],Val (IntVal 0)),(ConsPat (IdentifierPat "x") (IdentifierPat "xs"),Var "x")]) ~?= Right (IntVal 1),
+        stepExpToValue (Let "x" (TupleConst [Val (IntVal 1),Val (IntVal 2)]) (Op2 (Var "x") Cons (ListConst []))) ~?= Right (ListVal [TupleVal [IntVal 1,IntVal 2]])
       ]
 
 -- >>> runTestTT test_stepExpressionToValue
--- Counts {cases = 4, tried = 4, errors = 0, failures = 0}
+-- Counts {cases = 6, tried = 6, errors = 0, failures = 0}
 
 
--- >>> stepExpToValue (Let "is_even" (Val (FunctionVal "x" (If (Op2 (Op2 (Var "x") Mod (Val (IntVal 2))) Eq (Val (IntVal 0))) (Var "True") (Var "False")))) (Apply (Var "is_even") (Val (IntVal 4))))
--- Left "Variable True not found! Make sure you've defined it."
+-- >>> stepExpToValue (Let "x" (TupleConst [Val (IntVal 1),Val (IntVal 2)]) (Op2 (Var "x") Cons (ListConst [])))
+-- Right (ListVal [ListVal [IntVal 1,IntVal 2]])
 {-
 
 # Substitution Semantics
