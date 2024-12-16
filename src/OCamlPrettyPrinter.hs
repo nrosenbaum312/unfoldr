@@ -5,6 +5,7 @@ import Test.QuickCheck as QC
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
+import Control.Applicative (liftA2)
 import OCamlSyntax
 
 class PP a where

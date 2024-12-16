@@ -375,11 +375,10 @@ s'' = Apply (Val (FunctionVal "x" (Val (FunctionVal "y" (Op2 (Var "x") Plus (Var
 transform = parse expP "fun f -> fun l -> \
   \begin match l with \
   \| [] -> [] \
-  \| (x::xs) -> (f x :: (transform f xs)) \
+  \| x::xs -> (f x :: (transform f xs)) \
   \end"
 
 -- >>> transform
--- Right (Val (FunctionVal "f" (Val (FunctionVal "l" (Match (Var "l") [(ListPat [],ListConst [])])))))
 
 -- >>> pretty $ stepExpNToExp 0 s
 -- >>> pretty $ stepExpNToExp 1 s

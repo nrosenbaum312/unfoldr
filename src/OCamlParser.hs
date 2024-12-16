@@ -11,6 +11,7 @@ import Test.HUnit
 import qualified Data.Char as Char
 import System.IO (getContents)  -- For reading from standard input
 import Test.QuickCheck as QC
+import Control.Applicative (liftA2)
 
 -- Helper Parsers
 wsP :: Parser a -> Parser a
